@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tracker de Partidos</title>
+  <link rel="icon" href="copa .png" type="image/svg+xml" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <!-- BANNER DE TEMPORADA -->
+  <div class="season-banner" id="season-banner">
+    <div class="season-info">
+      <span class="season-icon">🏅</span>
+      <span id="season-name-display">Sin temporada activa</span>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="season-edit-btn" onclick="openSeasonModal()"><i class="ti ti-pencil"></i></button>
+      <button class="season-edit-btn admin-logout" id="admin-logout-btn" style="display:none;color:var(--red);" onclick="adminLogout()" title="Cerrar sesión admin">
+        <i class="ti ti-lock"></i>
+      </button>
+    </div>
+  </div>
+
+  <h1>⚽ Tracker de partidos</h1>
+
+  <div class="tabs" id="main-tabs">
+    <button class="tab active" onclick="switchTab('registro')">Registrar</button>
+    <button class="tab" onclick="switchTab('jugadores')">Jugadores</button>
+    <button class="tab" onclick="switchTab('historial')">Historial</button>
+    <button class="tab" onclick="switchTab('ranking')">Ranking</button>
+    <button class="tab" onclick="switchTab('dashboard')">Dashboard</button>
+  </div>
+
+  <!-- TAB: REGISTRO -->
+  <div id="tab-registro">
+    <div class="card team-card team-local">
+      <div class="team-header">
+        <span class="team-badge local-badge">🏠 Local</span>
+      </div>
+      <div class="section-label">Jugadores locales</div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="player-select-local" style="flex:1; min-width:120px;"></select>
+        <button class="btn btn-primary" onclick="addToTeam('local')">Agregar</button>
+      </div>
+      <div id="match-players-local"><div class="empty">Selecciona jugadores del equipo local</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Resultado del partido</div>
+      <div class="result-hint">¿Cómo le fue al equipo <strong>local</strong>?</div>
+      <div class="row result-row" style="margin-bottom:14px;">
+        <button class="result-btn w" id="btn-w" onclick="selectResult('w')">🏆 Victoria local</button>
+        <button class="result-btn d" id="btn-d" onclick="selectResult('d')">🤝 Empate</button>
+        <button class="result-btn l" id="btn-l" onclick="selectResult('l')">💀 Derrota local</button>
+      </div>
+      <div class="score-row" id="score-row" style="display:none;">
+        <div class="score-label">🏠 Goles local</div>
+        <div class="score-inputs">
+          <button class="score-btn" onclick="changeScore('local',-1)">−</button>
+          <span class="score-num" id="score-local">0</span>
+          <button class="score-btn" onclick="changeScore('local',+1)">+</button>
+        </div>
+        <div class="score-sep">–</div>
+        <div class="score-inputs">
+          <button class="score-btn" onclick="changeScore('visit',-1)">−</button>
+          <span class="score-num" id="score-visit">0</span>
+          <button class="score-btn" onclick="changeScore('visit',+1)">+</button>
+        </div>
+        <div class="score-label">✈️ Goles visit.</div>
+      </div>
+      <button class="btn btn-primary" id="save-btn" onclick="saveMatch()" disabled>Guardar partido</button>
+    </div>
+
+    <div class="card team-card team-visitante">
+      <div class="team-header">
+        <span class="team-badge visit-badge">✈️ Visitante</span>
+        <span class="result-mirror" id="result-mirror"></span>
+      </div>
+      <div class="section-label">Jugadores visitantes</div>
+      <div class="row" style="margin-bottom:8px;">
+        <select id="player-select-visit" style="flex:1; min-width:120px;"></select>
+        <button class="btn btn-primary" onclick="addToTeam('visit')">Agregar</button>
+      </div>
+      <div id="match-players-visit"><div class="empty">Selecciona jugadores del equipo visitante</div></div>
+    </div>
+  </div>
+
+  <!-- TAB: JUGADORES -->
+  <div id="tab-jugadores" style="display:none;">
+    <div class="card">
+      <div class="section-label">Nuevo jugador</div>
+      <div class="row">
+        <input type="text" id="new-player-name" placeholder="Nombre del jugador"
+          style="flex:1; max-width:240px;" onkeydown="if(event.key==='Enter') addPlayer()" />
+        <button class="btn btn-primary" onclick="addPlayer()">Agregar</button>
+      </div>
+      <div class="err" id="add-err" style="display:none;"></div>
+    </div>
+    <div class="card">
+      <div class="section-label">Jugadores registrados</div>
+      <div id="players-list"></div>
+    </div>
+  </div>
+
+  <!-- TAB: HISTORIAL -->
+  <div id="tab-historial" style="display:none;">
+    <div class="row" style="margin-bottom:1rem; gap:8px;">
+      <select id="filter-player" onchange="renderHistory()" style="flex:1;"></select>
+      <select id="filter-result" onchange="renderHistory()" style="max-width:160px;">
+        <option value="">Todos los resultados</option>
+        <option value="w">Victoria</option>
+        <option value="d">Empate</option>
+        <option value="l">Derrota</option>
+      </select>
+    </div>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+      <button class="btn btn-danger-outline" onclick="clearHistory()">
+        <i class="ti ti-trash"></i> Borrar historial
+      </button>
+    </div>
+    <div class="card" id="history-list"></div>
+  </div>
+
+  <!-- TAB: RANKING -->
+  <div id="tab-ranking" style="display:none;">
+    <div class="ranking-section-title">🎮 Jugador más activo</div>
+    <div class="card" style="margin-bottom:12px;"><div id="rank-most-active"></div></div>
+
+    <div class="ranking-section-title">👤 Ranking individual</div>
+    <div class="ranking-row">
+      <div class="card ranking-card"><div class="ranking-title rank-w">🏆 Victorias</div><div id="rank-wins"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-d">🤝 Empates</div><div id="rank-draws"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-l">💀 Derrotas</div><div id="rank-losses"></div></div>
+    </div>
+
+    <div class="ranking-section-title">⚔️ Ranking 2 vs 2</div>
+    <div class="ranking-row">
+      <div class="card ranking-card"><div class="ranking-title rank-w">🏆 Más victorias</div><div id="rank-2v2-wins"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-d">🤝 Más empates</div><div id="rank-2v2-draws"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-l">💀 Más derrotas</div><div id="rank-2v2-losses"></div></div>
+    </div>
+
+    <div class="ranking-section-title">⚔️ Ranking 2 vs 3</div>
+    <div class="ranking-row">
+      <div class="card ranking-card"><div class="ranking-title rank-w">🏆 Más victorias</div><div id="rank-2v3-wins"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-d">🤝 Más empates</div><div id="rank-2v3-draws"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-l">💀 Más derrotas</div><div id="rank-2v3-losses"></div></div>
+    </div>
+
+    <div class="ranking-section-title">⚔️ Ranking 3 vs 3</div>
+    <div class="ranking-row">
+      <div class="card ranking-card"><div class="ranking-title rank-w">🏆 Más victorias</div><div id="rank-3v3-wins"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-d">🤝 Más empates</div><div id="rank-3v3-draws"></div></div>
+      <div class="card ranking-card"><div class="ranking-title rank-l">💀 Más derrotas</div><div id="rank-3v3-losses"></div></div>
+    </div>
+  </div>
+
+  <!-- TAB: DASHBOARD -->
+  <div id="tab-dashboard" style="display:none;">
+    <!-- Stats globales -->
+    <div class="ranking-section-title">🌍 Resumen global</div>
+    <div id="dashboard-global"></div>
+
+    <!-- Head to Head -->
+    <div class="ranking-section-title">⚔️ Head to Head</div>
+    <div class="card">
+      <div class="row" style="margin-bottom:12px; gap:8px;">
+        <select id="h2h-p1" style="flex:1;"></select>
+        <span style="color:var(--text3); font-weight:700;">vs</span>
+        <select id="h2h-p2" style="flex:1;"></select>
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="renderH2H()">Ver enfrentamiento</button>
+      <div id="h2h-result" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Logros -->
+    <div class="ranking-section-title">🏅 Logros y medallas</div>
+    <div id="dashboard-logros"></div>
+
+    <!-- Gráfica de evolución -->
+    <div class="ranking-section-title">📈 Evolución de victorias</div>
+    <div class="card">
+      <div style="margin-bottom:10px;">
+        <select id="evo-player" onchange="renderEvolution()" style="width:100%;"></select>
+      </div>
+      <canvas id="evo-chart" height="180"></canvas>
+      <div id="evo-empty" class="empty" style="display:none;">Sin partidos suficientes.</div>
+    </div>
+
+    <!-- Comparar temporadas -->
+    <div class="ranking-section-title">🏅 Comparar temporadas</div>
+    <div id="season-comparison"></div>
+  </div>
+
+  <!-- TAB: DETALLE JUGADOR -->
+  <div id="tab-player-detail" style="display:none;">
+    <button class="back-btn" onclick="switchTab('jugadores')">
+      <i class="ti ti-arrow-left"></i> Volver
+    </button>
+    <div class="card" id="player-detail-content"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL TEMPORADA -->
+<div class="modal-overlay" id="season-modal" onclick="closeSeasonModal(event)">
+  <div class="modal-box">
+    <div class="modal-title">🏅 Temporada</div>
+    <input type="text" id="season-input" placeholder="ej. Temporada Mayo 2026" maxlength="40" />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSeasonModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSeason()">Guardar</button>
+    </div>
+    <button class="btn btn-danger-outline" style="width:100%;margin-top:8px;" onclick="clearSeason()">Quitar temporada</button>
+  </div>
+</div>
+
+<!-- MODAL AVATAR -->
+<div class="modal-overlay" id="avatar-modal" onclick="closeAvatarModal(event)">
+  <div class="modal-box">
+    <div class="modal-title">🎨 Personalizar jugador</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Elige un color de avatar</div>
+    <div class="color-picker" id="color-picker"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeAvatarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAvatar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTÓN ADMIN FLOTANTE (esquina inferior derecha) -->
+<button class="admin-fab" id="admin-fab" onclick="openLoginModal()" title="Acceso administrador">
+  <i class="ti ti-lock"></i>
+</button>
+
+<!-- MODAL PIN -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal-box">
+    <div class="modal-title">🔐 Acceso administrador</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Inicia sesión para editar.</div>
+    <input type="email" id="login-email" placeholder="Email" style="margin-bottom:8px;" />
+    <input type="password" id="login-password" placeholder="Contraseña" style="margin-bottom:4px;"
+      onkeydown="if(event.key==='Enter') submitLogin()" />
+    <div id="login-error" style="color:var(--red);font-size:12px;margin-top:6px;display:none;"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeLoginModal()">Cancelar</button>
+      <button class="btn btn-primary" id="login-submit-btn" onclick="submitLogin()">Entrar</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
