@@ -624,8 +624,29 @@ function selectResult(r) {
 }
 
 function changeScore(team, delta) {
-  if (team==='local') { state.scoreLocal=Math.max(0,state.scoreLocal+delta); document.getElementById('score-local').textContent=state.scoreLocal; }
-  else { state.scoreVisit=Math.max(0,state.scoreVisit+delta); document.getElementById('score-visit').textContent=state.scoreVisit; }
+  if (team === 'local') {
+    const newVal = Math.max(0, state.scoreLocal + delta);
+    if (state.selectedResult === 'd' && newVal !== state.scoreVisit) {
+      state.scoreLocal = newVal;
+      state.scoreVisit = newVal;
+      document.getElementById('score-local').textContent = newVal;
+      document.getElementById('score-visit').textContent = newVal;
+    } else if (state.selectedResult !== 'd') {
+      state.scoreLocal = newVal;
+      document.getElementById('score-local').textContent = newVal;
+    }
+  } else {
+    const newVal = Math.max(0, state.scoreVisit + delta);
+    if (state.selectedResult === 'd' && newVal !== state.scoreLocal) {
+      state.scoreVisit = newVal;
+      state.scoreLocal = newVal;
+      document.getElementById('score-visit').textContent = newVal;
+      document.getElementById('score-local').textContent = newVal;
+    } else if (state.selectedResult !== 'd') {
+      state.scoreVisit = newVal;
+      document.getElementById('score-visit').textContent = newVal;
+    }
+  }
 }
 
 function updateSaveBtn() {
