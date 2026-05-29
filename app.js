@@ -27,8 +27,7 @@ function applyAdminMode() {
   });
   const tabRegistro = document.getElementById('tab-btn-registro');
 if (tabRegistro) {
-  tabRegistro.style.opacity = isAdmin ? '' : '0.35';
-  tabRegistro.style.pointerEvents = isAdmin ? '' : 'none';
+  tabRegistro.style.display = isAdmin ? '' : 'none';
 }
   document.querySelectorAll('.btn-primary').forEach(el => {
     const isH2H = el.getAttribute('onclick') === 'renderH2H()';

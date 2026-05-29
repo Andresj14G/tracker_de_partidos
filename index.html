@@ -29,15 +29,15 @@
   <h1>⚽ Tracker de partidos</h1>
 
   <div class="tabs" id="main-tabs">
-    <button class="tab active" id="tab-btn-registro" onclick="switchTab('registro')">Registrar</button>
-    <button class="tab" onclick="switchTab('jugadores')">Jugadores</button>
+    <button class="tab" id="tab-btn-registro" onclick="switchTab('registro')">Registrar</button>
+    <button class="tab active" onclick="switchTab('jugadores')">Jugadores</button>
     <button class="tab" onclick="switchTab('historial')">Historial</button>
     <button class="tab" onclick="switchTab('ranking')">Ranking</button>
     <button class="tab" onclick="switchTab('dashboard')">Dashboard</button>
   </div>
 
   <!-- TAB: REGISTRO -->
-  <div id="tab-registro">
+  <div id="tab-registro" style="display: none;">
     <div class="card team-card team-local">
       <div class="team-header">
         <span class="team-badge local-badge">🏠 Local</span>
@@ -91,7 +91,7 @@
   </div>
 
   <!-- TAB: JUGADORES -->
-  <div id="tab-jugadores" style="display:none;">
+  <div id="tab-jugadores">
     <div class="card">
       <div class="section-label">Nuevo jugador</div>
       <div class="row">
