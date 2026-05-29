@@ -25,6 +25,11 @@ function applyAdminMode() {
       el.style.cursor = isAdmin ? '' : 'not-allowed';
     });
   });
+  const tabRegistro = document.getElementById('tab-btn-registro');
+if (tabRegistro) {
+  tabRegistro.style.opacity = isAdmin ? '' : '0.35';
+  tabRegistro.style.pointerEvents = isAdmin ? '' : 'none';
+}
   document.querySelectorAll('.btn-primary').forEach(el => {
     const isH2H = el.getAttribute('onclick') === 'renderH2H()';
     const isLogin = el.id === 'login-submit-btn';
