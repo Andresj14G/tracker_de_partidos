@@ -157,7 +157,10 @@ function avatarHTML(p, size = 42) {
 
 // ─── Navegación ───────────────────────────────────────────────────────────────
 
-function switchTab(tab) {
+function switchTab(tab) { if (tab === 'registro' && !isAdmin) {
+    showToast('Solo el admin puede registrar partidos', 'danger');
+    return;
+  }
   ['registro','jugadores','historial','ranking','dashboard','player-detail'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
   });
