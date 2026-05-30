@@ -624,31 +624,41 @@ function selectResult(r) {
 }
 
 function changeScore(team, delta) {
+  if (state.selectedResult === 'd') {
+    const newVal = Math.max(0, state.scoreLocal + delta);
+    state.scoreLocal = newVal;
+    state.scoreVisit = newVal;
+    document.getElementById('score-local').textContent = newVal;
+    document.getElementById('score-visit').textContent = newVal;
+    return;
+  }
+
   if (team === 'local') {
     const newVal = Math.max(0, state.scoreLocal + delta);
-    if (state.selectedResult === 'd' && newVal !== state.scoreVisit) {
-      state.scoreLocal = newVal;
-      state.scoreVisit = newVal;
-      document.getElementById('score-local').textContent = newVal;
-      document.getElementById('score-visit').textContent = newVal;
-    } else if (state.selectedResult !== 'd') {
-      state.scoreLocal = newVal;
-      document.getElementById('score-local').textContent = newVal;
+    if (state.selectedResult === 'w' && newVal < state.scoreVisit) {
+      showToast('El local debe tener más goles que el visitante', 'danger');
+      return;
     }
+    if (state.selectedResult === 'l' && newVal > state.scoreVisit) {
+      showToast('El visitante debe tener más goles que el local', 'danger');
+      return;
+    }
+    state.scoreLocal = newVal;
+    document.getElementById('score-local').textContent = newVal;
   } else {
     const newVal = Math.max(0, state.scoreVisit + delta);
-    if (state.selectedResult === 'd' && newVal !== state.scoreLocal) {
-      state.scoreVisit = newVal;
-      state.scoreLocal = newVal;
-      document.getElementById('score-visit').textContent = newVal;
-      document.getElementById('score-local').textContent = newVal;
-    } else if (state.selectedResult !== 'd') {
-      state.scoreVisit = newVal;
-      document.getElementById('score-visit').textContent = newVal;
+    if (state.selectedResult === 'w' && newVal >= state.scoreLocal) {
+      showToast('El local debe tener más goles que el visitante', 'danger');
+      return;
     }
+    if (state.selectedResult === 'l' && newVal < state.scoreLocal) {
+      showToast('El visitante debe tener más goles que el local', 'danger');
+      return;
+    }
+    state.scoreVisit = newVal;
+    document.getElementById('score-visit').textContent = newVal;
   }
 }
-
 function updateSaveBtn() {
   const btn = document.getElementById('save-btn');
   if (btn) btn.disabled=!(state.localPlayers.length>=1&&state.visitPlayers.length>=1&&state.selectedResult);
@@ -656,6 +666,19 @@ function updateSaveBtn() {
 
 async function saveMatch() {
   if (!state.localPlayers.length || !state.visitPlayers.length || !state.selectedResult) return;
+  // Validar goles coherentes con resultado
+  if (state.selectedResult === 'w' && state.scoreLocal <= state.scoreVisit) {
+    showToast('El local debe tener más goles que el visitante', 'danger');
+    return;
+  }
+  if (state.selectedResult === 'l' && state.scoreVisit <= state.scoreLocal) {
+    showToast('El visitante debe tener más goles que el local', 'danger');
+    return;
+  }
+  if (state.selectedResult === 'd' && state.scoreLocal !== state.scoreVisit) {
+    showToast('En empate los goles deben ser iguales', 'danger');
+    return;
+  }
   const now = new Date();
   const date = now.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
   const id = genId();
