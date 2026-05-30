@@ -580,6 +580,10 @@ function addToTeam(team) {
   if (!sel.value) return;
   const arr   = team==='local' ? state.localPlayers : state.visitPlayers;
   const other = team==='local' ? state.visitPlayers : state.localPlayers;
+  if (arr.length >= 3) {
+    showToast('Máximo 3 jugadores por equipo', 'danger');
+    return;
+  }
   if (arr.includes(sel.value)||other.includes(sel.value)) {
     showToast('Este jugador ya está en un equipo','danger'); return;
   }
@@ -661,7 +665,7 @@ function changeScore(team, delta) {
 }
 function updateSaveBtn() {
   const btn = document.getElementById('save-btn');
-  if (btn) btn.disabled=!(state.localPlayers.length>=1&&state.visitPlayers.length>=1&&state.selectedResult);
+  if (btn) btn.disabled=!(state.localPlayers.length>=2&&state.visitPlayers.length>=2&&state.selectedResult);
 }
 
 async function saveMatch() {
