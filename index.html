@@ -20,8 +20,6 @@
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
       <button class="season-edit-btn" onclick="openSeasonModal()"><i class="ti ti-pencil"></i></button>
-      <button class="season-edit-btn admin-logout" id="admin-logout-btn" style="display:none;color:var(--red);" onclick="adminLogout()" title="Cerrar sesión admin">
-        <i class="ti ti-lock"></i>
       </button>
     </div>
   </div>
@@ -255,6 +253,9 @@
     </div>
   </div>
 </div>
+<button id="admin-logout-btn" onclick="adminLogout()" title="Cerrar sesión" style="display:none;position:fixed;top:12px;right:12px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;z-index:999;">
+  <i class="ti ti-lock"></i> Cerrar sesión
+</button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
