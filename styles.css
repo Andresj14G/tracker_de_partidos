@@ -625,7 +625,7 @@ input[type=text]:focus, select:focus {
 
 .rank-name-wrap { flex: 1; min-width: 0; }
 
-.rank-name  { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-name { font-size: 12px; font-weight: 500; white-space: normal; overflow: visible; text-overflow: unset; word-break: break-word; }
 .rank-games { font-size: 10px; color: var(--text2); }
 
 .rank-pill {
