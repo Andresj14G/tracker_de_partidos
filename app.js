@@ -86,6 +86,25 @@ const AVATAR_COLORS = [
   '#1A7D6B','#B5580B','#2E5FA3','#7A2B5F','#2D6E4E',
   '#C0392B','#1F618D','#117A65','#6C3483','#B7770D'
 ];
+const WIN_TITLES = [
+  { icon: '👑', name: 'Rey del vestuario' },
+  { icon: '🐐', name: 'La Cabra' },
+  { icon: '⚡', name: 'El Imparable' },
+  { icon: '🔥', name: 'El Depredador' },
+  { icon: '🏆', name: 'El Campeón' },
+  { icon: '💎', name: 'El Élite' },
+  { icon: '🦁', name: 'El León' }
+];
+
+const LOSS_TITLES = [
+  { icon: '💀', name: 'Cabeza de turco' },
+  { icon: '😤', name: 'El Eterno Perdedor' },
+  { icon: '😭', name: 'El Sufridor' },
+  { icon: '🪦', name: 'El Sepultado' },
+  { icon: '🥶', name: 'El Frío' },
+  { icon: '🤡', name: 'El Payaso' },
+  { icon: '🐔', name: 'El Gallina' }
+];
 
 let state = {
   players: [],
@@ -113,6 +132,45 @@ async function loadFromSupabase() {
   }));
   const seasonRow = (config || []).find(r => r.key === 'season');
   state.season = seasonRow ? seasonRow.value : '';
+  const winsIdx = (config || []).find(r => r.key === 'top1_wins_title_index');
+  const lossIdx = (config || []).find(r => r.key === 'top1_losses_title_index');
+  const winsPlayer = (config || []).find(r => r.key === 'top1_wins_player_id');
+  const lossPlayer = (config || []).find(r => r.key === 'top1_losses_player_id');
+  state.top1WinsTitleIndex = winsIdx ? parseInt(winsIdx.value) : 0;
+  state.top1LossesTitleIndex = lossIdx ? parseInt(lossIdx.value) : 0;
+  state.top1WinsPlayerId = winsPlayer ? winsPlayer.value : '';
+  state.top1LossesPlayerId = lossPlayer ? lossPlayer.value : '';
+}
+async function checkTop1Changes() {
+  if (!state.players.length || !state.matches.length) return;
+
+  const stats = state.players.map(p => {
+    const ms = state.matches.filter(m =>
+      (m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)
+    );
+    const w = ms.filter(m => getPlayerResult(m,p.id)==='w').length;
+    const l = ms.filter(m => getPlayerResult(m,p.id)==='l').length;
+    return { id: p.id, w, l };
+  });
+
+  const top1Wins = [...stats].sort((a,b) => b.w - a.w)[0];
+  const top1Losses = [...stats].sort((a,b) => b.l - a.l)[0];
+
+  if (top1Wins && top1Wins.id !== state.top1WinsPlayerId) {
+    const newIndex = (state.top1WinsTitleIndex + 1) % WIN_TITLES.length;
+    state.top1WinsPlayerId = top1Wins.id;
+    state.top1WinsTitleIndex = newIndex;
+    await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_wins_title_index');
+    await sb.from('config').update({ value: top1Wins.id }).eq('key', 'top1_wins_player_id');
+  }
+
+  if (top1Losses && top1Losses.id !== state.top1LossesPlayerId) {
+    const newIndex = (state.top1LossesTitleIndex + 1) % LOSS_TITLES.length;
+    state.top1LossesPlayerId = top1Losses.id;
+    state.top1LossesTitleIndex = newIndex;
+    await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_losses_title_index');
+    await sb.from('config').update({ value: top1Losses.id }).eq('key', 'top1_losses_player_id');
+  }
 }
 
 function save() {} // ya no se usa, cada operación llama a Supabase directamente
@@ -572,6 +630,15 @@ function getPlayerAchievements(p, ms, w, d, l, streak) {
   });
   if (goalsFor >= 10) achievements.push({ icon:'⚽', name:'Goleador', desc:'10+ goles a favor' });
   if (goalsFor >= 30) achievements.push({ icon:'🎳', name:'Máquina', desc:'30+ goles a favor' });
+  // Logro único top 1
+  if (p.id === state.top1WinsPlayerId && state.players.length > 1) {
+    const title = WIN_TITLES[state.top1WinsTitleIndex % WIN_TITLES.length];
+    achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 en victorias' });
+  }
+  if (p.id === state.top1LossesPlayerId && state.players.length > 1) {
+    const title = LOSS_TITLES[state.top1LossesTitleIndex % LOSS_TITLES.length];
+    achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 en derrotas' });
+  }
 
   return achievements;
 }
@@ -1351,6 +1418,7 @@ function renderSeasonComparison() {
 
 (async () => {
   await loadFromSupabase();
+  await checkTop1Changes();
   updateSelects();
   renderPlayersList();
   renderSeasonBanner();
