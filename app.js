@@ -413,22 +413,24 @@ function showPlayerDetail(id) {
     }
   }
 
-  const partnerRows = partnerEntries.map(([pid,s])=>{
+  const partnerRows = partnerEntries
+  .map(([pid,s]) => ({ pid, ...s, total: s.w+s.d+s.l }))
+  .sort((a,b) => b.total - a.total)
+  .map(({pid,w,d,l,total}) => {
     const partner = state.players.find(x=>x.id===pid);
-    const name = partner?partner.name:'Desconocido';
-    const tot=s.w+s.d+s.l;
-    return `<div class="list-item">
+    const name = partner ? partner.name : 'Desconocido';
+    return `<div class="list-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        ${partner?avatarHTML(partner,28):''}
+        ${partner ? avatarHTML(partner,28) : ''}
         <div>
           <div style="font-size:14px;font-weight:500;">${name}</div>
-          <div style="font-size:11px;color:var(--text2);">${tot} partido${tot!==1?'s':''} juntos</div>
+          <div style="font-size:11px;color:var(--text2);">${total} partido${total!==1?'s':''} como compañeros</div>
         </div>
       </div>
-      <div style="display:flex;gap:5px;">
-        <span class="pill pill-w">${s.w}V</span>
-        <span class="pill pill-d">${s.d}E</span>
-        <span class="pill pill-l">${s.l}D</span>
+      <div style="display:flex;gap:12px;font-size:13px;padding-left:36px;">
+        <span style="color:var(--green);">🏆 ${w} ganado${w!==1?'s':''}</span>
+        <span style="color:var(--amber);">🤝 ${d} empate${d!==1?'s':''}</span>
+        <span style="color:var(--red);">💀 ${l} perdido${l!==1?'s':''}</span>
       </div>
     </div>`;
   }).join('');
