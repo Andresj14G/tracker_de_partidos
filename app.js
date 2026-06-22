@@ -413,18 +413,19 @@ function showPlayerDetail(id) {
     }
   }
 
-  const partnerRows = partnerEntries
+const partnerRows = partnerEntries
   .map(([pid,s]) => ({ pid, ...s, total: s.w+s.d+s.l }))
   .sort((a,b) => b.total - a.total)
   .map(({pid,w,d,l,total}) => {
     const partner = state.players.find(x=>x.id===pid);
     const name = partner ? partner.name : 'Desconocido';
+    const pct = total ? Math.round((w/total)*100) : 0;
     return `<div class="list-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;width:100%;">
         ${partner ? avatarHTML(partner,28) : ''}
-        <div>
+        <div style="flex:1;">
           <div style="font-size:14px;font-weight:500;">${name}</div>
-          <div style="font-size:11px;color:var(--text2);">${total} partido${total!==1?'s':''} como compañeros</div>
+          <div style="font-size:11px;color:var(--text2);">${total} partido${total!==1?'s':''} como compañeros · <span style="color:var(--blue);font-weight:600;">${pct}% victorias juntos</span></div>
         </div>
       </div>
       <div style="display:flex;gap:12px;font-size:13px;padding-left:36px;">
