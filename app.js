@@ -973,6 +973,28 @@ function renderGlobal() {
     });
     if(gf>topGoalsFor){topGoalsFor=gf;topScorer=p;}
   });
+  // Top 3 goleadores  ← AGREGA DESDE AQUÍ
+const top3Scorers = state.players.map(p => {
+  let gf = 0;
+  state.matches.forEach(m => {
+    if (m.goalsLocal === undefined) return;
+    const isLocal = (m.localPlayers||[]).includes(p.id);
+    const isVisit = (m.visitPlayers||[]).includes(p.id);
+    if (isLocal) gf += m.goalsLocal;
+    else if (isVisit) gf += m.goalsVisit;
+  });
+  return { p, gf };
+}).filter(x => x.gf > 0).sort((a,b) => b.gf - a.gf).slice(0,3);
+const top3Medals = ['🥇','🥈','🥉'];
+const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
+  <div class="list-item">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">${top3Medals[i]}</span>
+      ${avatarHTML(x.p, 28)}
+      <div class="match-name">${x.p.name}</div>
+    </div>
+    <span class="pill pill-w">${x.gf} goles</span>
+  </div>`).join('') : '<div class="empty">Sin goles registrados.</div>';
 
   el.innerHTML=`
     <div class="global-grid">
@@ -987,7 +1009,11 @@ function renderGlobal() {
       </div><span class="score-chip">${topMatch.goalsLocal} – ${topMatch.goalsVisit}</span></div>`:''}
       ${topDay?`<div class="list-item"><div class="match-name">📅 Día más activo</div><span style="font-weight:600;color:var(--blue);">${dayNames[parseInt(topDay[0])]} (${topDay[1]} partidos)</span></div>`:''}
       ${topScorer&&topGoalsFor>0?`<div class="list-item"><div style="display:flex;align-items:center;gap:8px;">${avatarHTML(topScorer,28)}<div class="match-name">⚽ Máximo goleador: ${topScorer.name}</div></div><span class="pill pill-w">${topGoalsFor} goles</span></div>`:''}
-    </div>`;
+      <div class="list-item" style="border-bottom:none;padding-bottom:4px;">
+        <div class="match-name">⚽ Top 3 goleadores</div>
+      </div>
+      ${top3HTML}
+        </div>`;
 }
 
 function renderLogros() {
