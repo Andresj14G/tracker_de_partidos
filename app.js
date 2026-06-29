@@ -1008,7 +1008,6 @@ const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
         <div class="match-meta">${(topMatch.localPlayers||[]).map(id=>{const p=state.players.find(x=>x.id===id);return p?p.name:'?';}).join(', ')} vs ${(topMatch.visitPlayers||[]).map(id=>{const p=state.players.find(x=>x.id===id);return p?p.name:'?';}).join(', ')}</div>
       </div><span class="score-chip">${topMatch.goalsLocal} – ${topMatch.goalsVisit}</span></div>`:''}
       ${topDay?`<div class="list-item"><div class="match-name">📅 Día más activo</div><span style="font-weight:600;color:var(--blue);">${dayNames[parseInt(topDay[0])]} (${topDay[1]} partidos)</span></div>`:''}
-      ${topScorer&&topGoalsFor>0?`<div class="list-item"><div style="display:flex;align-items:center;gap:8px;">${avatarHTML(topScorer,28)}<div class="match-name">⚽ Máximo goleador: ${topScorer.name}</div></div><span class="pill pill-w">${topGoalsFor} goles</span></div>`:''}
       <div class="list-item" style="border-bottom:none;padding-bottom:4px;">
         <div class="match-name">⚽ Top 3 goleadores</div>
       </div>
