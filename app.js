@@ -537,7 +537,10 @@ const partnerRows = partnerEntries
     </div>` : '';
 
   // Últimos partidos
-  const recentMatches = [...ms].reverse().slice(0,15).map(m=>{
+  function buildRecentMatchesHTML(ms, id) {
+  const filter = state.profileFilter || '';
+  let filtered = filter ? ms.filter(m => getPlayerResult(m,id) === filter) : ms;
+  return [...filtered].reverse().slice(0,15).map(m=>{
     const myResult=getPlayerResult(m,id);
     const localNames=(m.localPlayers||m.players||[])
       .map(pid=>{const pl=state.players.find(x=>x.id===pid);return pl?pl.name:'?';}).join(', ');
@@ -554,7 +557,8 @@ const partnerRows = partnerEntries
       </div>
       <span class="pill ${PILL_CLASS[myResult]}">${LABELS[myResult]}</span>
     </div>`;
-  }).join('');
+  }).join('') || '<div class="empty">No hay partidos con ese filtro.</div>';
+}
 
   document.getElementById('player-detail-content').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:0.75rem;">
@@ -582,11 +586,21 @@ const partnerRows = partnerEntries
       ${bestPartnerHTML}${rivalEasyHTML}${rivalDiffHTML}`:''}
     ${partnerRows?`<div class="detail-section-title">🧑‍🤝‍🧑 Con quién ha jugado</div>${partnerRows}`:''}
     ${recordsHTML(p, ms)}
-    ${recentMatches?`<div class="detail-section-title">🕒 Últimos partidos</div>${recentMatches}`:''}
-    ${!total?'<div class="empty">Sin partidos registrados.</div>':''}
+    ${total?`<div class="detail-section-title">🕒 Últimos partidos</div>
+  <div class="row" style="gap:6px;margin-bottom:10px;">
+    <button class="btn ${!state.profileFilter?'btn-primary':''}" style="padding:5px 12px;font-size:12px;" onclick="filterProfileMatches('${id}','')">Todos</button>
+    <button class="btn" style="padding:5px 12px;font-size:12px;${state.profileFilter==='w'?'background:var(--green);color:#fff;border-color:var(--green);':''}" onclick="filterProfileMatches('${id}','w')">V</button>
+    <button class="btn" style="padding:5px 12px;font-size:12px;${state.profileFilter==='d'?'background:var(--amber);color:#fff;border-color:var(--amber);':''}" onclick="filterProfileMatches('${id}','d')">E</button>
+    <button class="btn" style="padding:5px 12px;font-size:12px;${state.profileFilter==='l'?'background:var(--red);color:#fff;border-color:var(--red);':''}" onclick="filterProfileMatches('${id}','l')">D</button>
+  </div>
+  ${buildRecentMatchesHTML(ms,id)}`:''}
   `;
 }
-
+// filtro //
+function filterProfileMatches(id, result) {
+  state.profileFilter = result;
+  showPlayerDetail(id);
+}
 // ─── Logros ───────────────────────────────────────────────────────────────────
 
 function getPlayerAchievements(p, ms, w, d, l, streak) {
