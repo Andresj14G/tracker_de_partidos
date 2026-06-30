@@ -540,7 +540,7 @@ const partnerRows = partnerEntries
   function buildRecentMatchesHTML(ms, id) {
   const filter = state.profileFilter || '';
   let filtered = filter ? ms.filter(m => getPlayerResult(m,id) === filter) : ms;
-  return [...filtered].reverse().slice(0,15).map(m=>{
+  return [...filtered].reverse().map(m=>{
     const myResult=getPlayerResult(m,id);
     const localNames=(m.localPlayers||m.players||[])
       .map(pid=>{const pl=state.players.find(x=>x.id===pid);return pl?pl.name:'?';}).join(', ');
@@ -550,10 +550,11 @@ const partnerRows = partnerEntries
       ?`<strong>${localNames}</strong> vs <strong>${visitNames}</strong>`
       :`Con: <strong>${localNames}</strong>`;
     const scoreStr=(m.goalsLocal!==undefined)?`<span class="score-chip">${m.goalsLocal} – ${m.goalsVisit}</span> `:'';
+    const seasonStr=m.season?` · 🏅 ${m.season}`:'';
     return `<div class="list-item">
       <div>
         <div class="match-name">${teamsStr}</div>
-        <div class="match-meta">${scoreStr}${m.date}</div>
+        <div class="match-meta">${scoreStr}${m.date}${seasonStr}</div>
       </div>
       <span class="pill ${PILL_CLASS[myResult]}">${LABELS[myResult]}</span>
     </div>`;
