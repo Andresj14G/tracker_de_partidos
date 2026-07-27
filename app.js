@@ -1028,26 +1028,28 @@ function renderGlobal() {
   });
 
   // Día más activo
-  const dayCount={};
-  const dayNames=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  state.matches.forEach(m=>{
-    if(!m.date) return;
-    // Aproximamos el día con el índice del día de la semana usando Date
-    // La fecha viene como "21 may. 2026, 15:30"
-    // Usamos un truco: parseamos solo la parte de fecha
-    try {
-      const parts=m.date.split(',')[0].trim().split(' ');
-      const d=parseInt(parts[0]);
-      const monthMap={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
-      const mo=monthMap[parts[1].replace('.','').toLowerCase()];
-      const yr=parseInt(parts[2]);
-      if(!isNaN(d)&&mo!==undefined&&!isNaN(yr)){
-        const dayIdx=new Date(yr,mo,d).getDay();
-        dayCount[dayIdx]=(dayCount[dayIdx]||0)+1;
-      }
-    } catch(e){}
-  });
-  const topDay=Object.entries(dayCount).sort((a,b)=>b[1]-a[1])[0];
+const dayCount = {};
+const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+state.matches.forEach(m => {
+  if (!m.date) return;
+  try {
+    const monthMap = {
+      'ene':0,'feb':1,'mar':2,'abr':3,'may':4,'jun':5,
+      'jul':6,'ago':7,'sep':8,'oct':9,'nov':10,'dic':11
+    };
+    const clean = m.date.toLowerCase().replace(/\./g,'').replace(/\s+/g,' ').trim();
+    const parts = clean.split(' ');
+    // formato: "01 de jun de 2026 12:20 a m" o similar
+    const d = parseInt(parts[0]);
+    const mo = monthMap[parts[2]] !== undefined ? monthMap[parts[2]] : monthMap[parts[1]];
+    const yr = parseInt(parts[3]) || parseInt(parts[4]);
+    if (!isNaN(d) && mo !== undefined && !isNaN(yr)) {
+      const dayIdx = new Date(yr, mo, d).getDay();
+      dayCount[dayIdx] = (dayCount[dayIdx] || 0) + 1;
+    }
+  } catch(e) {}
+});
+const topDay = Object.entries(dayCount).sort((a,b) => b[1] - a[1])[0];
 
   // Jugador más goleador
   let topScorer=null, topGoalsFor=0;
