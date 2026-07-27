@@ -71,7 +71,12 @@
         </div>
         <div class="score-label">✈️ Goles visit.</div>
       </div>
-      <button class="btn btn-primary" id="save-btn" onclick="saveMatch()" disabled>Guardar partido</button>
+      <div id="scorers-section" style="display:none;margin-top:14px;">
+  <div class="section-label">⚽ ¿Quién anotó los goles?</div>
+  <div id="scorers-list"></div>
+  <div id="scorers-error" style="font-size:12px;color:var(--red);margin-top:6px;display:none;"></div>
+</div>
+<button class="btn btn-primary" id="save-btn" onclick="saveMatch()" disabled>Guardar partido</button>
     </div>
 
     <div class="card team-card team-visitante">

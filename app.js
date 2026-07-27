@@ -115,7 +115,8 @@ let state = {
   season: '',
   scoreLocal: 0,
   scoreVisit: 0,
-  editingAvatarId: null
+  editingAvatarId: null,
+  scorers: {}
 };
 
 async function loadFromSupabase() {
@@ -128,7 +129,7 @@ async function loadFromSupabase() {
   state.matches = (matches || []).map(m => ({
     id: m.id, localPlayers: m.local_players, visitPlayers: m.visit_players,
     result: m.result, goalsLocal: m.goals_local, goalsVisit: m.goals_visit,
-    season: m.season, date: m.date
+    season: m.season, date: m.date, scorers: m.scorers || {}
   }));
   const seasonRow = (config || []).find(r => r.key === 'season');
   state.season = seasonRow ? seasonRow.value : '';
@@ -428,21 +429,24 @@ function showPlayerDetail(id) {
   const streak = calcStreak(ms, id);
 
   // Goles
-  let goalsFor=0, goalsAgainst=0, matchesWithScore=0;
+  let goalsFor=0, goalsAgainst=0, goalsIndividual=0, matchesWithScore=0;
   ms.forEach(m => {
     if (m.goalsLocal===undefined) return;
     matchesWithScore++;
     const isLocal = (m.localPlayers||[]).includes(id);
     goalsFor     += isLocal ? m.goalsLocal : m.goalsVisit;
     goalsAgainst += isLocal ? m.goalsVisit : m.goalsLocal;
+    if (m.scorers && m.scorers[id]) goalsIndividual += m.scorers[id];
   });
+  const avgIndividual = matchesWithScore ? (goalsIndividual/matchesWithScore).toFixed(1) : '—';
   const avgFor = matchesWithScore ? (goalsFor/matchesWithScore).toFixed(1) : '—';
   const goalsHTML = matchesWithScore ? `
     <div class="detail-section-title">⚽ Estadísticas de goles</div>
     <div class="goals-grid">
       <div class="stat-box"><div class="stat-num" style="color:var(--green);">${goalsFor}</div><div class="stat-lbl">a favor</div></div>
       <div class="stat-box"><div class="stat-num" style="color:var(--red);">${goalsAgainst}</div><div class="stat-lbl">en contra</div></div>
-      <div class="stat-box"><div class="stat-num" style="color:var(--blue);">${avgFor}</div><div class="stat-lbl">prom./partido</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--blue);">${goalsIndividual}</div><div class="stat-lbl">goles propios</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--amber);">${avgIndividual}</div><div class="stat-lbl">prom. propio</div></div>
     </div>` : '';
 
   // Compañeros
@@ -701,6 +705,10 @@ function renderTeamTags(team) {
 }
 
 function selectResult(r) {
+  if (state.localPlayers.length < 2 || state.visitPlayers.length < 2) {
+    showToast('Agrega mínimo 2 jugadores a cada equipo primero', 'danger');
+    return;
+  }
   state.selectedResult = r;
   ['w','d','l'].forEach(x=>{
     document.getElementById('btn-'+x).className='result-btn '+(x===r?'sel-'+x:x);
@@ -710,6 +718,7 @@ function selectResult(r) {
   const scoreRow = document.getElementById('score-row');
   if (scoreRow) scoreRow.style.display = r ? 'flex' : 'none';
   updateSaveBtn();
+  renderScorers();
 }
 
 function changeScore(team, delta) {
@@ -747,6 +756,60 @@ function changeScore(team, delta) {
     state.scoreVisit = newVal;
     document.getElementById('score-visit').textContent = newVal;
   }
+  renderScorers();
+}
+function renderScorers() {
+  const section = document.getElementById('scorers-section');
+  const list = document.getElementById('scorers-list');
+  if (!state.selectedResult || (state.scoreLocal === 0 && state.scoreVisit === 0)) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+
+  const allPlayers = [
+    ...state.localPlayers.map(id => ({ id, team: 'local' })),
+    ...state.visitPlayers.map(id => ({ id, team: 'visit' }))
+  ];
+
+  list.innerHTML = allPlayers.map(({ id, team }) => {
+    const p = state.players.find(x => x.id === id);
+    const name = p ? p.name : '?';
+    const current = state.scorers[id] || 0;
+    const teamLabel = team === 'local' ? '🏠' : '✈️';
+    return `<div class="list-item" style="padding:8px 0;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>${teamLabel}</span>
+        ${avatarHTML(p, 28)}
+        <span style="font-size:14px;">${name}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="score-btn" onclick="changeScorer('${id}',-1)">−</button>
+        <span style="font-size:18px;font-weight:700;min-width:24px;text-align:center;">${current}</span>
+        <button class="score-btn" onclick="changeScorer('${id}',+1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function changeScorer(id, delta) {
+  if (!state.scorers) state.scorers = {};
+  const newVal = Math.max(0, (state.scorers[id] || 0) + delta);
+  // Calcular total del equipo si se aplica el cambio
+  const isLocal = state.localPlayers.includes(id);
+  const teamPlayers = isLocal ? state.localPlayers : state.visitPlayers;
+  const teamMax = isLocal ? state.scoreLocal : state.scoreVisit;
+
+  const teamTotal = teamPlayers.reduce((sum, pid) => {
+    return sum + (pid === id ? newVal : (state.scorers[pid] || 0));
+  }, 0);
+  
+  if (teamTotal > teamMax) {
+    showToast(`El equipo solo puede tener ${teamMax} goles`, 'danger');
+    return;
+  }
+  state.scorers[id] = newVal;
+  renderScorers();
 }
 function updateSaveBtn() {
   const btn = document.getElementById('save-btn');
@@ -774,14 +837,14 @@ async function saveMatch() {
   const match = {
     id, local_players: [...state.localPlayers], visit_players: [...state.visitPlayers],
     result: state.selectedResult, goals_local: state.scoreLocal, goals_visit: state.scoreVisit,
-    season: state.season || '', date
+    season: state.season || '', date, scorers: state.scorers || {}
   };
   const { error } = await sb.from('matches').insert(match);
   if (error) { showToast('Error al guardar partido', 'danger'); return; }
   state.matches.push({
     id, localPlayers: match.local_players, visitPlayers: match.visit_players,
     result: match.result, goalsLocal: match.goals_local, goalsVisit: match.goals_visit,
-    season: match.season, date
+    season: match.season, date, scorers: match.scorers
   });
   state.localPlayers = []; state.visitPlayers = []; state.selectedResult = null;
   state.scoreLocal = 0; state.scoreVisit = 0;
@@ -792,6 +855,8 @@ async function saveMatch() {
   document.getElementById('result-mirror').innerHTML = '';
   renderTeamTags('local'); renderTeamTags('visit'); updateSaveBtn();
   checkStreakNotifications();
+  state.scorers = {};
+  renderScorers();
   showToast('Partido guardado ✓');
 }
 
@@ -992,11 +1057,7 @@ function renderGlobal() {
 const top3Scorers = state.players.map(p => {
   let gf = 0;
   state.matches.forEach(m => {
-    if (m.goalsLocal === undefined) return;
-    const isLocal = (m.localPlayers||[]).includes(p.id);
-    const isVisit = (m.visitPlayers||[]).includes(p.id);
-    if (isLocal) gf += m.goalsLocal;
-    else if (isVisit) gf += m.goalsVisit;
+    if (m.scorers && m.scorers[p.id]) gf += m.scorers[p.id];
   });
   return { p, gf };
 }).filter(x => x.gf > 0).sort((a,b) => b.gf - a.gf).slice(0,3);
@@ -1009,7 +1070,7 @@ const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
       <div class="match-name">${x.p.name}</div>
     </div>
     <span class="pill pill-w">${x.gf} goles</span>
-  </div>`).join('') : '<div class="empty">Sin goles registrados.</div>';
+  </div>`).join('') : '<div class="empty">Sin goles individuales registrados.</div>';
 
   el.innerHTML=`
     <div class="global-grid">
