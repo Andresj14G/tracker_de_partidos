@@ -29,6 +29,10 @@ function applyAdminMode() {
 if (tabRegistro) {
   tabRegistro.style.display = isAdmin ? '' : 'none';
 }
+  const tabHistorial = document.getElementById('tab-btn-historial');
+if (tabHistorial) {
+  tabHistorial.style.display = isAdmin ? '' : 'none';
+}
   document.querySelectorAll('.btn-primary').forEach(el => {
     const isH2H = el.getAttribute('onclick') === 'renderH2H()';
     const isLogin = el.id === 'login-submit-btn';
@@ -220,8 +224,13 @@ function avatarHTML(p, size = 42) {
 
 // ─── Navegación ───────────────────────────────────────────────────────────────
 
-function switchTab(tab) { if (tab === 'registro' && !isAdmin) {
+function switchTab(tab) { 
+  if (tab === 'registro' && !isAdmin) {
     showToast('Solo el admin puede registrar partidos', 'danger');
+    return;
+  }
+  if (tab === 'historial' && !isAdmin) {
+    showToast('Solo el admin puede ver el historial', 'danger');
     return;
   }
   ['registro','jugadores','historial','ranking','dashboard','player-detail'].forEach(t => {
