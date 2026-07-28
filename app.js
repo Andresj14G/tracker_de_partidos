@@ -120,7 +120,8 @@ let state = {
   scoreLocal: 0,
   scoreVisit: 0,
   editingAvatarId: null,
-  scorers: {}
+  scorers: {},
+  assists: {}
 };
 
 async function loadFromSupabase() {
@@ -133,7 +134,7 @@ async function loadFromSupabase() {
   state.matches = (matches || []).map(m => ({
     id: m.id, localPlayers: m.local_players, visitPlayers: m.visit_players,
     result: m.result, goalsLocal: m.goals_local, goalsVisit: m.goals_visit,
-    season: m.season, date: m.date, scorers: m.scorers || {}
+    season: m.season, date: m.date, scorers: m.scorers || {}, assists: m.assists || {}
   }));
   const seasonRow = (config || []).find(r => r.key === 'season');
   state.season = seasonRow ? seasonRow.value : '';
@@ -438,7 +439,7 @@ function showPlayerDetail(id) {
   const streak = calcStreak(ms, id);
 
   // Goles
-  let goalsFor=0, goalsAgainst=0, goalsIndividual=0, matchesWithScore=0;
+  let goalsFor=0, goalsAgainst=0, goalsIndividual=0, assistsIndividual=0, matchesWithScore=0;
   ms.forEach(m => {
     if (m.goalsLocal===undefined) return;
     matchesWithScore++;
@@ -446,16 +447,18 @@ function showPlayerDetail(id) {
     goalsFor     += isLocal ? m.goalsLocal : m.goalsVisit;
     goalsAgainst += isLocal ? m.goalsVisit : m.goalsLocal;
     if (m.scorers && m.scorers[id]) goalsIndividual += m.scorers[id];
+    if (m.assists && m.assists[id]) assistsIndividual += m.assists[id];
   });
   const avgIndividual = matchesWithScore ? (goalsIndividual/matchesWithScore).toFixed(1) : '—';
   const avgFor = matchesWithScore ? (goalsFor/matchesWithScore).toFixed(1) : '—';
   const goalsHTML = matchesWithScore ? `
     <div class="detail-section-title">⚽ Estadísticas de goles</div>
-    <div class="goals-grid">
-      <div class="stat-box"><div class="stat-num" style="color:var(--green);">${goalsFor}</div><div class="stat-lbl">a favor</div></div>
-      <div class="stat-box"><div class="stat-num" style="color:var(--red);">${goalsAgainst}</div><div class="stat-lbl">en contra</div></div>
+    <div class="goals-grid" style="grid-template-columns:repeat(5,1fr);">
+      <div class="stat-box"><div class="stat-num" style="color:var(--green);">${goalsFor}</div><div class="stat-lbl">equipo a favor</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--red);">${goalsAgainst}</div><div class="stat-lbl">equipo en contra</div></div>
       <div class="stat-box"><div class="stat-num" style="color:var(--blue);">${goalsIndividual}</div><div class="stat-lbl">goles propios</div></div>
       <div class="stat-box"><div class="stat-num" style="color:var(--amber);">${avgIndividual}</div><div class="stat-lbl">prom. propio</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--blue);">🎯 ${assistsIndividual}</div><div class="stat-lbl">asistencias</div></div>
     </div>` : '';
 
   // Compañeros
@@ -728,6 +731,7 @@ function selectResult(r) {
   if (scoreRow) scoreRow.style.display = r ? 'flex' : 'none';
   updateSaveBtn();
   renderScorers();
+  renderAssists();
 }
 
 function changeScore(team, delta) {
@@ -819,6 +823,63 @@ function changeScorer(id, delta) {
   }
   state.scorers[id] = newVal;
   renderScorers();
+  renderAssists();
+  
+}
+function renderAssists() {
+  const section = document.getElementById('assists-section');
+  const list = document.getElementById('assists-list');
+  if (!state.selectedResult || (state.scoreLocal === 0 && state.scoreVisit === 0)) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+
+  const allPlayers = [
+    ...state.localPlayers.map(id => ({ id, team: 'local' })),
+    ...state.visitPlayers.map(id => ({ id, team: 'visit' }))
+  ];
+
+  list.innerHTML = allPlayers.map(({ id, team }) => {
+    const p = state.players.find(x => x.id === id);
+    const name = p ? p.name : '?';
+    const current = state.assists[id] || 0;
+    const teamLabel = team === 'local' ? '🏠' : '✈️';
+    return `<div class="list-item" style="padding:8px 0;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>${teamLabel}</span>
+        ${avatarHTML(p, 28)}
+        <span style="font-size:14px;">${name}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="score-btn" onclick="changeAssist('${id}',-1)">−</button>
+        <span style="font-size:18px;font-weight:700;min-width:24px;text-align:center;">${current}</span>
+        <button class="score-btn" onclick="changeAssist('${id}',+1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function changeAssist(id, delta) {
+  if (!state.assists) state.assists = {};
+  const newVal = Math.max(0, (state.assists[id] || 0) + delta);
+
+  // Total de asistencias del equipo no puede superar goles del equipo
+  const isLocal = state.localPlayers.includes(id);
+  const teamPlayers = isLocal ? state.localPlayers : state.visitPlayers;
+  const teamMax = isLocal ? state.scoreLocal : state.scoreVisit;
+
+  const teamTotal = teamPlayers.reduce((sum, pid) => {
+    return sum + (pid === id ? newVal : (state.assists[pid] || 0));
+  }, 0);
+
+  if (teamTotal > teamMax) {
+    showToast(`El equipo solo puede tener máximo ${teamMax} asistencias`, 'danger');
+    return;
+  }
+
+  state.assists[id] = newVal;
+  renderAssists();
 }
 function updateSaveBtn() {
   const btn = document.getElementById('save-btn');
@@ -846,14 +907,15 @@ async function saveMatch() {
   const match = {
     id, local_players: [...state.localPlayers], visit_players: [...state.visitPlayers],
     result: state.selectedResult, goals_local: state.scoreLocal, goals_visit: state.scoreVisit,
-    season: state.season || '', date, scorers: state.scorers || {}
+    season: state.season || '', date, scorers: state.scorers || {}, assists: state.assists || {}
+
   };
   const { error } = await sb.from('matches').insert(match);
   if (error) { showToast('Error al guardar partido', 'danger'); return; }
   state.matches.push({
     id, localPlayers: match.local_players, visitPlayers: match.visit_players,
     result: match.result, goalsLocal: match.goals_local, goalsVisit: match.goals_visit,
-    season: match.season, date, scorers: match.scorers
+    season: match.season, date, scorers: match.scorers, assists: match.assists
   });
   state.localPlayers = []; state.visitPlayers = []; state.selectedResult = null;
   state.scoreLocal = 0; state.scoreVisit = 0;
@@ -866,6 +928,8 @@ async function saveMatch() {
   checkStreakNotifications();
   state.scorers = {};
   renderScorers();
+  state.assists = {};
+  renderAssists();
   showToast('Partido guardado ✓');
 }
 
@@ -1064,7 +1128,7 @@ const topDay = Object.entries(dayCount).sort((a,b) => b[1] - a[1])[0];
     });
     if(gf>topGoalsFor){topGoalsFor=gf;topScorer=p;}
   });
-  // Top 3 goleadores  ← AGREGA DESDE AQUÍ
+  // Top 3 goleadores  
 const top3Scorers = state.players.map(p => {
   let gf = 0;
   state.matches.forEach(m => {
@@ -1082,6 +1146,24 @@ const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
     </div>
     <span class="pill pill-w">${x.gf} goles</span>
   </div>`).join('') : '<div class="empty">Sin goles individuales registrados.</div>';
+  // Top 3 asistidores
+const top3Assists = state.players.map(p => {
+  let a = 0;
+  state.matches.forEach(m => {
+    if (m.assists && m.assists[p.id]) a += m.assists[p.id];
+  });
+  return { p, a };
+}).filter(x => x.a > 0).sort((a,b) => b.a - a.a).slice(0,3);
+const top3AssistsMedals = ['🥇','🥈','🥉'];
+const top3AssistsHTML = top3Assists.length ? top3Assists.map((x,i) => `
+  <div class="list-item">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:18px;">${top3AssistsMedals[i]}</span>
+      ${avatarHTML(x.p, 28)}
+      <div class="match-name">${x.p.name}</div>
+    </div>
+    <span class="pill pill-d">${x.a} asistencias</span>
+  </div>`).join('') : '<div class="empty">Sin asistencias registradas.</div>';
 
   el.innerHTML=`
     <div class="global-grid">
@@ -1099,7 +1181,12 @@ const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
         <div class="match-name">⚽ Top 3 goleadores</div>
       </div>
       ${top3HTML}
-        </div>`;
+      <div class="list-item" style="border-bottom:none;padding-bottom:4px;">
+        <div class="match-name">🎯 Top 3 asistencias</div>
+      </div>
+      ${top3AssistsHTML}
+        </div>
+        `;
 }
 
 function renderLogros() {
