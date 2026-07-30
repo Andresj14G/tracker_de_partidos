@@ -122,7 +122,8 @@ let state = {
   editingAvatarId: null,
   scorers: {},
   assists: {},
-  reds: {}
+  reds: {},
+  selectedSeason: ''
 };
 
 async function loadFromSupabase() {
@@ -139,6 +140,9 @@ async function loadFromSupabase() {
   }));
   const seasonRow = (config || []).find(r => r.key === 'season');
   state.season = seasonRow ? seasonRow.value : '';
+  // Si la temporada activa no tiene partidos, usar la primera temporada disponible
+const availableSeasons = [...new Set(state.matches.map(m => m.season || '').filter(Boolean))];
+state.selectedSeason = availableSeasons.includes(state.season) ? state.season : (availableSeasons[0] || '');
   const winsIdx = (config || []).find(r => r.key === 'top1_wins_title_index');
   const lossIdx = (config || []).find(r => r.key === 'top1_losses_title_index');
   const winsPlayer = (config || []).find(r => r.key === 'top1_wins_player_id');
@@ -307,7 +311,7 @@ function renderPlayersList() {
     return;
   }
   el.innerHTML = state.players.map(p => {
-    const ms = state.matches.filter(m =>
+    const ms = getFilteredMatches().filter(m =>
       (m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id)
     );
     const w = ms.filter(m => getPlayerResult(m,p.id)==='w').length;
@@ -428,8 +432,9 @@ function showPlayerDetail(id) {
   const p = state.players.find(x => x.id === id);
   if (!p) return;
   switchTab('player-detail');
+  const matches = getFilteredMatches();
 
-  const ms = state.matches.filter(m =>
+  const ms = matches.filter(m =>
     (m.localPlayers||[]).includes(id)||(m.visitPlayers||[]).includes(id)||(m.players||[]).includes(id)
   );
   const w = ms.filter(m => getPlayerResult(m,id)==='w').length;
@@ -1047,6 +1052,8 @@ async function clearHistory() {
 // ─── Ranking ──────────────────────────────────────────────────────────────────
 
 function renderRanking() {
+  renderSeasonSelector('ranking-season-selector');
+  const matches = getFilteredMatches();
   const medals = ['🥇','🥈','🥉'];
 
   function buildRankList(sorted, key, pillClass) {
@@ -1069,7 +1076,7 @@ function renderRanking() {
     });
   } else {
     const stats = state.players.map(p=>{
-      const ms=state.matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id));
+      const ms=matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id));
       const w=ms.filter(m=>getPlayerResult(m,p.id)==='w').length;
       const d=ms.filter(m=>getPlayerResult(m,p.id)==='d').length;
       const l=ms.filter(m=>getPlayerResult(m,p.id)==='l').length;
@@ -1082,8 +1089,9 @@ function renderRanking() {
 
   // Equipos
   function buildTeamRanking(localSize, visitSize, winId, drawId, lossId) {
+    const teamMatches = matches;
     const teamMap={};
-    state.matches.forEach(m=>{
+    teamMatches.forEach(m=>{
       const lc=(m.localPlayers||[]).length, vc=(m.visitPlayers||[]).length;
       if(!((lc===localSize&&vc===visitSize)||(lc===visitSize&&vc===localSize))) return;
       const lKey=[...m.localPlayers].sort().join('|');
@@ -1111,7 +1119,7 @@ function renderRanking() {
   const elA=document.getElementById('rank-most-active');
   if(!state.players.length){elA.innerHTML='<div class="empty">Sin jugadores.</div>';return;}
   const byActivity=state.players.map(p=>{
-    const total=state.matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id)).length;
+    const total=matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id)).length;
     return {name:p.name,id:p.id,total,p};
   }).sort((a,b)=>b.total-a.total);
   const medals2=['🥇','🥈','🥉'];
@@ -1127,6 +1135,7 @@ function renderRanking() {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function renderDashboard() {
+  renderSeasonSelector('dashboard-season-selector');
   updateSelects();
   renderGlobal();
   renderLogros();
@@ -1136,16 +1145,17 @@ function renderDashboard() {
 
 function renderGlobal() {
   const el = document.getElementById('dashboard-global');
-  const total = state.matches.length;
+  const matches = getFilteredMatches();
+  const total = matches.length;
   if (!total) { el.innerHTML='<div class="card"><div class="empty">Aún no hay partidos.</div></div>'; return; }
 
-  const wins   = state.matches.filter(m=>m.result==='w').length;
-  const draws  = state.matches.filter(m=>m.result==='d').length;
-  const losses = state.matches.filter(m=>m.result==='l').length;
+  const wins   = matches.filter(m=>m.result==='w').length;
+  const draws  = matches.filter(m=>m.result==='d').length;
+  const losses = matches.filter(m=>m.result==='l').length;
 
   // Partido más goleado
   let topMatch=null, topGoals=0;
-  state.matches.forEach(m=>{
+  matches.forEach(m=>{
     if(m.goalsLocal===undefined) return;
     const g=m.goalsLocal+m.goalsVisit;
     if(g>topGoals){topGoals=g;topMatch=m;}
@@ -1154,7 +1164,7 @@ function renderGlobal() {
   // Día más activo
 const dayCount = {};
 const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-state.matches.forEach(m => {
+matches.forEach(m => {
   if (!m.date) return;
   try {
     const monthMap = {
@@ -1179,7 +1189,7 @@ const topDay = Object.entries(dayCount).sort((a,b) => b[1] - a[1])[0];
   let topScorer=null, topGoalsFor=0;
   state.players.forEach(p=>{
     let gf=0;
-    state.matches.forEach(m=>{
+    matches.forEach(m=>{
       if(m.goalsLocal===undefined) return;
       const isLocal=(m.localPlayers||[]).includes(p.id);
       const isVisit=(m.visitPlayers||[]).includes(p.id);
@@ -1191,7 +1201,7 @@ const topDay = Object.entries(dayCount).sort((a,b) => b[1] - a[1])[0];
   // Top 3 goleadores  
 const top3Scorers = state.players.map(p => {
   let gf = 0;
-  state.matches.forEach(m => {
+  matches.forEach(m => {
     if (m.scorers && m.scorers[p.id]) gf += m.scorers[p.id];
   });
   return { p, gf };
@@ -1209,7 +1219,7 @@ const top3HTML = top3Scorers.length ? top3Scorers.map((x,i) => `
   // Top 3 asistidores
 const top3Assists = state.players.map(p => {
   let a = 0;
-  state.matches.forEach(m => {
+  matches.forEach(m => {
     if (m.assists && m.assists[p.id]) a += m.assists[p.id];
   });
   return { p, a };
@@ -1227,7 +1237,7 @@ const top3AssistsHTML = top3Assists.length ? top3Assists.map((x,i) => `
   // Top 3 red cars
   const top3Reds = state.players.map(p => {
   let r = 0;
-  state.matches.forEach(m => {
+  matches.forEach(m => {
     if (m.reds && m.reds[p.id]) r += m.reds[p.id];
   });
   return { p, r };
@@ -1273,10 +1283,11 @@ const top3RedsHTML = top3Reds.length ? top3Reds.map((x,i) => `
 
 function renderLogros() {
   const el = document.getElementById('dashboard-logros');
+  const matches = getFilteredMatches();
   if (!state.players.length) { el.innerHTML='<div class="card"><div class="empty">Sin jugadores.</div></div>'; return; }
 
   el.innerHTML = state.players.map(p=>{
-    const ms=state.matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id));
+    const ms=matches.filter(m=>(m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)||(m.players||[]).includes(p.id));
     const w=ms.filter(m=>getPlayerResult(m,p.id)==='w').length;
     const d=ms.filter(m=>getPlayerResult(m,p.id)==='d').length;
     const l=ms.filter(m=>getPlayerResult(m,p.id)==='l').length;
@@ -1371,8 +1382,9 @@ function renderEvolution() {
   const canvas = document.getElementById('evo-chart');
   const emptyEl = document.getElementById('evo-empty');
   if (!pid) return;
+  const matches = getFilteredMatches();
 
-  const ms = state.matches.filter(m=>(m.localPlayers||[]).includes(pid)||(m.visitPlayers||[]).includes(pid)||(m.players||[]).includes(pid));
+  const ms = matches.filter(m=>(m.localPlayers||[]).includes(pid)||(m.visitPlayers||[]).includes(pid)||(m.players||[]).includes(pid));
   if (ms.length < 2) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
   canvas.style.display='block'; emptyEl.style.display='none';
 
@@ -1468,6 +1480,41 @@ function drawLineChart(canvas, labels, data) {
 function renderSeasonBanner() {
   const display=document.getElementById('season-name-display');
   if(display) display.textContent=state.season||'Sin temporada activa';
+}
+function getFilteredMatches() {
+  if (!state.selectedSeason) return state.matches;
+  return state.matches.filter(m => (m.season || '') === state.selectedSeason)
+}
+
+function getSeasons() {
+  const all = [...new Set(state.matches.map(m => m.season || '').filter(Boolean))];
+  return all.sort((a, b) => {
+    if (a === state.season) return -1;
+    if (b === state.season) return 1;
+    return 0;
+  });
+}
+
+function renderSeasonSelector(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const seasons = getSeasons();
+  if (!seasons.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:13px;color:var(--text2);">🏅 Temporada:</span>
+      <select style="flex:1;" onchange="changeSeason(this.value)">
+        ${seasons.map(s => `<option value="${s}" ${s === state.selectedSeason ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+    </div>`;
+}
+
+function changeSeason(season) {
+  state.selectedSeason = season;
+  const currentTab = document.querySelector('.tab.active')?.textContent?.toLowerCase().trim();
+  if (currentTab === 'ranking') renderRanking();
+  if (currentTab === 'dashboard') renderDashboard();
+  if (currentTab === 'jugadores') renderPlayersList();
 }
 function openSeasonModal() {
   document.getElementById('season-input').value=state.season||'';
