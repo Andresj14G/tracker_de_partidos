@@ -750,6 +750,9 @@ function changeScore(team, delta) {
     state.scoreVisit = newVal;
     document.getElementById('score-local').textContent = newVal;
     document.getElementById('score-visit').textContent = newVal;
+    renderScorers();
+    renderAssists();
+    renderReds();
     return;
   }
 
@@ -779,6 +782,8 @@ function changeScore(team, delta) {
     document.getElementById('score-visit').textContent = newVal;
   }
   renderScorers();
+  renderAssists();
+  renderReds();
 }
 function renderScorers() {
   const section = document.getElementById('scorers-section');
