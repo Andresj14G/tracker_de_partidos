@@ -110,6 +110,36 @@ const LOSS_TITLES = [
   { icon: '🐔', name: 'El Gallina' }
 ];
 
+const GOAL_TITLES = [
+  { icon: '⚽', name: 'El Killer' },
+  { icon: '🎯', name: 'El Francotirador' },
+  { icon: '🔫', name: 'El Artillero' },
+  { icon: '👑', name: 'El Rey del Gol' },
+  { icon: '💀', name: 'El Verdugo' },
+  { icon: '🔥', name: 'El Depredador' },
+  { icon: '🦁', name: 'El Cazador' }
+];
+
+const ASSIST_TITLES = [
+  { icon: '🎩', name: 'El Mago del Pase' },
+  { icon: '🎬', name: 'El Director de Orquesta' },
+  { icon: '🦅', name: 'El Visionario' },
+  { icon: '🌟', name: 'La Estrella Creativa' },
+  { icon: '🃏', name: 'El As bajo la Manga' },
+  { icon: '🕸️', name: ' El Tejedor de Jugadas' },
+  { icon: '👁️', name: 'El Ojo de Halcón' }
+];
+
+const RED_TITLES = [
+  { icon: '🟥', name: 'El Bruto' },
+  { icon: '🧨', name: 'El Caótico' },
+  { icon: '🔥', name: 'El Devastador' },
+  { icon: '🌪️', name: 'El Huracán Rojo' },
+  { icon: '💀', name: 'El Verdugo' },
+  { icon: '🐺', name: 'El Cazador' },
+  { icon: '🩸', name: 'El Sanguinario' }
+];
+
 let state = {
   players: [],
   matches: [],
@@ -147,10 +177,22 @@ state.selectedSeason = availableSeasons.includes(state.season) ? state.season : 
   const lossIdx = (config || []).find(r => r.key === 'top1_losses_title_index');
   const winsPlayer = (config || []).find(r => r.key === 'top1_wins_player_id');
   const lossPlayer = (config || []).find(r => r.key === 'top1_losses_player_id');
+  const goalIdx = (config || []).find(r => r.key === 'top1_goals_title_index');
+  const assistIdx = (config || []).find(r => r.key === 'top1_assists_title_index');
+  const redIdx = (config || []).find(r => r.key === 'top1_reds_title_index');
+  const goalPlayer = (config || []).find(r => r.key === 'top1_goals_player_id');
+  const assistPlayer = (config || []).find(r => r.key === 'top1_assists_player_id');
+  const redPlayer = (config || []).find(r => r.key === 'top1_reds_player_id');
   state.top1WinsTitleIndex = winsIdx ? parseInt(winsIdx.value) : 0;
   state.top1LossesTitleIndex = lossIdx ? parseInt(lossIdx.value) : 0;
   state.top1WinsPlayerId = winsPlayer ? winsPlayer.value : '';
   state.top1LossesPlayerId = lossPlayer ? lossPlayer.value : '';
+  state.top1GoalsTitleIndex = goalIdx ? parseInt(goalIdx.value) : 0;
+  state.top1AssistsTitleIndex = assistIdx ? parseInt(assistIdx.value) : 0;
+  state.top1RedsTitleIndex = redIdx ? parseInt(redIdx.value) : 0;
+  state.top1GoalsPlayerId = goalPlayer ? goalPlayer.value : '';
+  state.top1AssistsPlayerId = assistPlayer ? assistPlayer.value : '';
+  state.top1RedsPlayerId = redPlayer ? redPlayer.value : '';
 }
 async function checkTop1Changes() {
   if (!state.players.length || !state.matches.length) return;
@@ -166,12 +208,24 @@ async function checkTop1Changes() {
     );
     const w = ms.filter(m => getPlayerResult(m,p.id)==='w').length;
     const l = ms.filter(m => getPlayerResult(m,p.id)==='l').length;
-    return { id: p.id, w, l };
-  }).filter(s => s.w > 0 || s.l > 0);
-  if (!stats.length) return;
+    let g = 0, a = 0, r = 0;
+    ms.forEach(m => {
+      if (m.scorers && m.scorers[p.id]) g += m.scorers[p.id];
+      if (m.assists && m.assists[p.id]) a += m.assists[p.id];
+      if (m.reds && m.reds[p.id]) r += m.reds[p.id];
+    });
+    return { id: p.id, w, l, g, a, r };
+  });
 
-  const top1Wins = [...stats].sort((a,b) => b.w - a.w)[0];
-  const top1Losses = [...stats].sort((a,b) => b.l - a.l)[0];
+  const winStats = stats.filter(s => s.w > 0 || s.l > 0);
+  const top1Wins = [...winStats].sort((a,b) => b.w - a.w)[0];
+  const top1Losses = [...winStats].sort((a,b) => b.l - a.l)[0];
+  const goalStats = stats.filter(s => s.g > 0);
+  const top1Goals = goalStats.length ? [...goalStats].sort((a,b) => b.g - a.g)[0] : null;
+  const assistStats = stats.filter(s => s.a > 0);
+  const top1Assists = assistStats.length ? [...assistStats].sort((a,b) => b.a - a.a)[0] : null;
+  const redStats = stats.filter(s => s.r > 0);
+  const top1Reds = redStats.length ? [...redStats].sort((a,b) => b.r - a.r)[0] : null;
 
   if (top1Wins && top1Wins.id !== state.top1WinsPlayerId) {
     const newIndex = (state.top1WinsTitleIndex + 1) % WIN_TITLES.length;
@@ -187,6 +241,30 @@ async function checkTop1Changes() {
     state.top1LossesTitleIndex = newIndex;
     await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_losses_title_index');
     await sb.from('config').update({ value: top1Losses.id }).eq('key', 'top1_losses_player_id');
+  }
+
+  if (top1Goals && top1Goals.id !== state.top1GoalsPlayerId) {
+    const newIndex = (state.top1GoalsTitleIndex + 1) % GOAL_TITLES.length;
+    state.top1GoalsPlayerId = top1Goals.id;
+    state.top1GoalsTitleIndex = newIndex;
+    await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_goals_title_index');
+    await sb.from('config').update({ value: top1Goals.id }).eq('key', 'top1_goals_player_id');
+  }
+
+  if (top1Assists && top1Assists.id !== state.top1AssistsPlayerId) {
+    const newIndex = (state.top1AssistsTitleIndex + 1) % ASSIST_TITLES.length;
+    state.top1AssistsPlayerId = top1Assists.id;
+    state.top1AssistsTitleIndex = newIndex;
+    await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_assists_title_index');
+    await sb.from('config').update({ value: top1Assists.id }).eq('key', 'top1_assists_player_id');
+  }
+
+  if (top1Reds && top1Reds.id !== state.top1RedsPlayerId) {
+    const newIndex = (state.top1RedsTitleIndex + 1) % RED_TITLES.length;
+    state.top1RedsPlayerId = top1Reds.id;
+    state.top1RedsTitleIndex = newIndex;
+    await sb.from('config').update({ value: String(newIndex) }).eq('key', 'top1_reds_title_index');
+    await sb.from('config').update({ value: top1Reds.id }).eq('key', 'top1_reds_player_id');
   }
 }
 
@@ -683,6 +761,18 @@ function getPlayerAchievements(p, ms, w, d, l, streak) {
   if (p.id === state.top1LossesPlayerId && state.players.length > 1) {
     const title = LOSS_TITLES[state.top1LossesTitleIndex % LOSS_TITLES.length];
     achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 en derrotas' });
+  }
+  if (p.id === state.top1GoalsPlayerId && state.players.length > 1) {
+    const title = GOAL_TITLES[state.top1GoalsTitleIndex % GOAL_TITLES.length];
+    achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 goleador' });
+  }
+  if (p.id === state.top1AssistsPlayerId && state.players.length > 1) {
+    const title = ASSIST_TITLES[state.top1AssistsTitleIndex % ASSIST_TITLES.length];
+    achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 en asistencias' });
+  }
+  if (p.id === state.top1RedsPlayerId && state.players.length > 1) {
+    const title = RED_TITLES[state.top1RedsTitleIndex % RED_TITLES.length];
+    achievements.push({ icon: title.icon, name: title.name, desc: 'Top 1 en tarjetas rojas' });
   }
 
   return achievements;
