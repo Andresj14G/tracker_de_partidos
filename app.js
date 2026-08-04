@@ -155,14 +155,20 @@ state.selectedSeason = availableSeasons.includes(state.season) ? state.season : 
 async function checkTop1Changes() {
   if (!state.players.length || !state.matches.length) return;
 
+  const seasonMatches = state.season
+    ? state.matches.filter(m => m.season === state.season)
+    : state.matches;
+  if (!seasonMatches.length) return;
+
   const stats = state.players.map(p => {
-    const ms = state.matches.filter(m =>
+    const ms = seasonMatches.filter(m =>
       (m.localPlayers||[]).includes(p.id)||(m.visitPlayers||[]).includes(p.id)
     );
     const w = ms.filter(m => getPlayerResult(m,p.id)==='w').length;
     const l = ms.filter(m => getPlayerResult(m,p.id)==='l').length;
     return { id: p.id, w, l };
-  });
+  }).filter(s => s.w > 0 || s.l > 0);
+  if (!stats.length) return;
 
   const top1Wins = [...stats].sort((a,b) => b.w - a.w)[0];
   const top1Losses = [...stats].sort((a,b) => b.l - a.l)[0];
@@ -1000,6 +1006,7 @@ async function saveMatch() {
   renderAssists();
   state.reds = {};
   renderReds();
+  await checkTop1Changes();
   showToast('Partido guardado ✓');
 }
 
@@ -1536,6 +1543,7 @@ async function saveSeason() {
   state.season = val; renderSeasonBanner();
   document.getElementById('season-modal').classList.remove('open');
   showToast(val ? `Temporada "${val}" guardada ✓` : 'Temporada eliminada');
+  await checkTop1Changes();
 }
 
 async function clearSeason() {
@@ -1543,6 +1551,7 @@ async function clearSeason() {
   state.season = ''; renderSeasonBanner();
   document.getElementById('season-modal').classList.remove('open');
   showToast('Temporada eliminada');
+  await checkTop1Changes();
 }
 
 document.addEventListener('keydown',e=>{
