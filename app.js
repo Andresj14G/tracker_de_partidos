@@ -1335,7 +1335,7 @@ function renderH2H() {
   const p2=state.players.find(x=>x.id===p2id);
 
   // Partidos juntos (mismo equipo)
-  const together = state.matches.filter(m=>{
+  const together = getFilteredMatches().filter(m=>{
     const lc=(m.localPlayers||[]), vc=(m.visitPlayers||[]), all=(m.players||[]);
     return (lc.includes(p1id)&&lc.includes(p2id))||(vc.includes(p1id)&&vc.includes(p2id))||(all.includes(p1id)&&all.includes(p2id));
   });
@@ -1344,7 +1344,7 @@ function renderH2H() {
   const togL=together.filter(m=>getPlayerResult(m,p1id)==='l').length;
 
   // Partidos enfrentados (equipos contrarios)
-  const versus = state.matches.filter(m=>{
+  const versus = getFilteredMatches().filter(m=>{
     const lc=m.localPlayers||[], vc=m.visitPlayers||[];
     return (lc.includes(p1id)&&vc.includes(p2id))||(lc.includes(p2id)&&vc.includes(p1id));
   });
