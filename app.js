@@ -638,7 +638,7 @@ const partnerRows = partnerEntries
   const achievementsHTML = achievements.length ? `
     <div class="detail-section-title">🏅 Logros</div>
     <div class="achievements-row">${achievements.map(a=>`
-      <div class="achievement-badge" title="${a.desc}" onclick="showToast(a.desc)">
+      <div class="achievement-badge" title="${a.desc}" onclick="showToast('${a.desc.replace(/'/g,"\\'")}')">
         <span class="achievement-icon">${a.icon}</span>
         <span class="achievement-name">${a.name}</span>
       </div>`).join('')}
@@ -1402,7 +1402,7 @@ function renderLogros() {
         <div style="font-size:14px;font-weight:500;">${p.name}</div>
       </div>
       <div class="achievements-row">${achievements.map(a=>`
-        <div class="achievement-badge" title="${a.desc}" onclick="showToast(a.desc)">
+        <div class="achievement-badge" title="${a.desc}" onclick="showToast('${a.desc.replace(/'/g,"\\'")}')">
           <span class="achievement-icon">${a.icon}</span>
           <span class="achievement-name">${a.name}</span>
         </div>`).join('')}
