@@ -47,6 +47,21 @@ if (tabHistorial) {
   });
 }
 
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const icon = document.querySelector('#theme-toggle i');
+  if (icon) icon.className = t === 'dark' ? 'ti ti-sun' : 'ti ti-moon';
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('theme', next); } catch (e) {}
+  applyTheme(next);
+  if (document.getElementById('evo-chart')?.offsetParent) renderEvolution();
+}
+
+applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+
 function openLoginModal() {
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
@@ -1538,7 +1553,7 @@ function drawLineChart(canvas, labels, data) {
   const cH=H-pad.top-pad.bottom;
 
   // Color desde CSS variable
-  const isDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const lineColor=isDark?'#85B7EB':'#185FA5';
   const gridColor=isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)';
   const textColor=isDark?'#a8a69f':'#6b6a65';
