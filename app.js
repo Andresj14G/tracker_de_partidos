@@ -512,6 +512,24 @@ function formBarHTML(ms, id) {
     <div class="form-bar">${dots}</div>`;
 }
 
+function matchEventsHTML(m) {
+  const fmt = obj => Object.entries(obj || {})
+    .filter(([, n]) => n > 0)
+    .map(([pid, n]) => {
+      const pl = state.players.find(x => x.id === pid);
+      return (pl ? pl.name : '?') + (n > 1 ? ` (${n})` : '');
+    }).join(', ');
+  const lines = [
+    ['⚽', fmt(m.scorers)],
+    ['🎯', fmt(m.assists)],
+    ['🟥', fmt(m.reds)]
+  ].filter(([, txt]) => txt)
+   .map(([icon, txt]) => `${icon} ${txt}`);
+  if (!lines.length) return '';
+  return `<div class="match-events">${lines.join('<br>')}</div>`;
+}
+
+
 function showPlayerDetail(id) {
   const p = state.players.find(x => x.id === id);
   if (!p) return;
@@ -663,6 +681,7 @@ const partnerRows = partnerEntries
       <div>
         <div class="match-name">${teamsStr}</div>
         <div class="match-meta">${scoreStr}${m.date}${seasonStr}</div>
+        ${matchEventsHTML(m)}
       </div>
       <span class="pill ${PILL_CLASS[myResult]}">${LABELS[myResult]}</span>
     </div>`;
