@@ -710,7 +710,10 @@ const partnerRows = partnerEntries
         <div class="match-meta">${scoreStr}${m.date}${seasonStr}</div>
         ${matchEventsHTML(m)}
       </div>
-      <span class="pill ${PILL_CLASS[myResult]}">${LABELS[myResult]}</span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <span class="pill ${PILL_CLASS[myResult]}">${LABELS[myResult]}</span>
+        <button class="btn" style="padding:3px 10px;font-size:11px;" onclick="openShareModal('${m.id}')">📤 Compartir</button>
+      </div>
     </div>`;
   }).join('') || '<div class="empty">No hay partidos con ese filtro.</div>';
 }
@@ -1146,6 +1149,7 @@ async function saveMatch() {
   renderReds();
   await checkTop1Changes();
   showToast('Partido guardado ✓');
+  openShareModal(id);
 }
 
 // ─── Historial ────────────────────────────────────────────────────────────────
@@ -1373,6 +1377,132 @@ function renderMVPMonths() {
       <span class="pill rank-pill" style="background:var(--amber-bg);color:var(--amber);">${x.winner.avg.toFixed(1)} pts</span>
     </div>`;
   }).join('');
+}
+
+// ─── Tarjeta para compartir ───────────────────────────────────────────────────
+let shareBlob = null;
+
+function wrapLines(ctx, text, maxW) {
+  const lines = [];
+  let line = '';
+  text.split(' ').forEach(w => {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawMatchCard(m) {
+  const W = 1080, PAD = 70;
+  const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const playerName = id => (state.players.find(x => x.id === id) || {}).name || '?';
+  const namesOf = ids => (ids || []).map(playerName).join(', ');
+  const fmt = obj => Object.entries(obj || {}).filter(([, n]) => n > 0)
+    .map(([pid, n]) => playerName(pid) + (n > 1 ? ` (${n})` : '')).join(', ');
+
+  const accent = m.result === 'w' ? '#97C459' : m.result === 'l' ? '#F09595' : '#EF9F27';
+  const resultLabel = m.result === 'w' ? 'VICTORIA LOCAL' : m.result === 'l' ? 'VICTORIA VISITANTE' : 'EMPATE';
+  const scoreTxt = m.goalsLocal !== undefined ? `${m.goalsLocal} – ${m.goalsVisit}` : 'VS';
+  const datePart = (m.date || '').split(',')[0];
+  const sub = [m.season ? '🏅 ' + m.season : '', datePart].filter(Boolean).join('  ·  ');
+
+  const events = [
+    ['⭐', 'MVP', mvpNames(m)],
+    ['⚽', 'Goles', fmt(m.scorers)],
+    ['🎯', 'Asistencias', fmt(m.assists)],
+    ['🟥', 'Rojas', fmt(m.reds)]
+  ].filter(e => e[2]);
+
+  // Medir para calcular el alto
+  const colW = (W - PAD * 2 - 40) / 2;
+  const mctx = document.createElement('canvas').getContext('2d');
+  mctx.font = `600 38px ${FONT}`;
+  const localLines = wrapLines(mctx, namesOf(m.localPlayers || m.players), colW);
+  const visitLines = wrapLines(mctx, namesOf(m.visitPlayers), colW);
+  const teamLines = Math.max(localLines.length, visitLines.length);
+  mctx.font = `500 36px ${FONT}`;
+  const eventBlocks = events.map(e => wrapLines(mctx, `${e[0]} ${e[1]}: ${e[2]}`, W - PAD * 2));
+
+  const namesTop = 340;
+  const scoreY = namesTop + teamLines * 50 + 180;
+  const labelY = scoreY + 80;
+  const evStart = labelY + 100;
+  const evHeight = eventBlocks.reduce((s, b) => s + b.length * 48 + 18, 0);
+  const H = Math.max(1100, evStart + evHeight + 90);
+
+  // Dibujar
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#242422'); bg.addColorStop(1, '#141413');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 14);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f0ede8'; ctx.font = `700 52px ${FONT}`;
+  ctx.fillText('⚽ TRACKER DE PARTIDOS', W / 2, 120);
+  ctx.fillStyle = '#a8a69f'; ctx.font = `500 32px ${FONT}`;
+  ctx.fillText(sub, W / 2, 175);
+
+  ctx.font = `600 28px ${FONT}`;
+  ctx.fillText('🏠 LOCAL', PAD + colW / 2, 280);
+  ctx.fillText('✈️ VISITANTE', W - PAD - colW / 2, 280);
+  ctx.fillStyle = '#f0ede8'; ctx.font = `600 38px ${FONT}`;
+  localLines.forEach((l, i) => ctx.fillText(l, PAD + colW / 2, namesTop + i * 50));
+  visitLines.forEach((l, i) => ctx.fillText(l, W - PAD - colW / 2, namesTop + i * 50));
+
+  ctx.fillStyle = accent; ctx.font = `800 190px ${FONT}`;
+  ctx.fillText(scoreTxt, W / 2, scoreY);
+  ctx.font = `700 40px ${FONT}`;
+  ctx.fillText(resultLabel, W / 2, labelY);
+
+  ctx.textAlign = 'left'; ctx.font = `500 36px ${FONT}`;
+  let y = evStart;
+  eventBlocks.forEach((block, bi) => {
+    ctx.fillStyle = events[bi][1] === 'MVP' ? '#EF9F27' : '#f0ede8';
+    block.forEach(line => { ctx.fillText(line, PAD, y); y += 48; });
+    y += 18;
+  });
+
+  return canvas;
+}
+
+async function openShareModal(matchId) {
+  const m = state.matches.find(x => x.id === matchId);
+  if (!m) return;
+  const canvas = drawMatchCard(m);
+  shareBlob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!shareBlob) { showToast('No se pudo crear la imagen', 'danger'); return; }
+  document.getElementById('share-preview').src = canvas.toDataURL('image/png');
+  const testFile = new File([shareBlob], 'partido.png', { type: 'image/png' });
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [testFile] }));
+  document.getElementById('share-btn').textContent = canShare ? 'Compartir' : 'Descargar';
+  document.getElementById('share-modal').classList.add('open');
+}
+
+function closeShareModal(e) {
+  if (e && e.target !== document.getElementById('share-modal')) return;
+  document.getElementById('share-modal').classList.remove('open');
+  shareBlob = null;
+}
+
+async function doShare() {
+  if (!shareBlob) return;
+  const file = new File([shareBlob], 'partido.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); } catch (e) {} // el usuario canceló
+    return;
+  }
+  const url = URL.createObjectURL(shareBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'partido.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast('Imagen descargada ✓');
 }
 
 function renderRanking() {

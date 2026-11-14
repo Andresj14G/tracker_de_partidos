@@ -258,6 +258,18 @@
   </div>
 </div>
 
+<!-- MODAL COMPARTIR PARTIDO -->
+<div class="modal-overlay" id="share-modal" onclick="closeShareModal(event)">
+  <div class="modal-box">
+    <div class="modal-title">📤 Compartir partido</div>
+    <img id="share-preview" alt="Tarjeta del partido" style="max-width:100%;max-height:60vh;display:block;margin:0 auto;border-radius:10px;" />
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeShareModal()">Cerrar</button>
+      <button class="btn" id="share-btn" onclick="doShare()" style="background:var(--blue-bg);color:var(--blue);">Compartir</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL AVATAR -->
 <div class="modal-overlay" id="avatar-modal" onclick="closeAvatarModal(event)">
   <div class="modal-box">
