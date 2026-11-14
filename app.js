@@ -534,7 +534,9 @@ function matchEventsHTML(m) {
       const pl = state.players.find(x => x.id === pid);
       return (pl ? pl.name : '?') + (n > 1 ? ` (${n})` : '');
     }).join(', ');
+  const mvps = mvpNames(m);
   const lines = [
+    ['⭐', mvps ? `MVP: ${mvps}` : ''],
     ['⚽', fmt(m.scorers)],
     ['🎯', fmt(m.assists)],
     ['🟥', fmt(m.reds)]
@@ -562,10 +564,15 @@ function showPlayerDetail(id) {
   const streak = calcStreak(ms, id);
   const eloData = calcElo(matches);
   const eloHTML = eloData.games[id] ? `
+  
     <div class="highlight-box" style="background:var(--blue-bg);color:var(--blue);">
       📊 <strong>ELO:</strong> ${eloData.ratings[id]} ${eloDeltaHTML(eloData.deltas[id])}
     </div>` : '';
-
+  const mvpCount = ms.filter(m => getMatchMVPs(m).includes(id)).length;
+  const mvpHTML = mvpCount ? `
+    <div class="highlight-box" style="background:var(--amber-bg);color:var(--amber);">
+      ⭐ <strong>MVPs:</strong> ${mvpCount}
+    </div>` : '';
   // Goles
   let goalsFor=0, goalsAgainst=0, goalsIndividual=0, assistsIndividual=0, redsIndividual=0, matchesWithScore=0;
   ms.forEach(m => {
@@ -726,7 +733,8 @@ const partnerRows = partnerEntries
       <div class="stat-box"><div class="stat-num" style="color:var(--red);">${l}</div><div class="stat-lbl">derrotas</div></div>
       <div class="stat-box"><div class="stat-num" style="color:var(--blue);">${winPct}%</div><div class="stat-lbl">% victorias</div></div>
     </div>
-     ${eloHTML}
+    ${eloHTML}
+    ${mvpHTML}
     ${formBarHTML(ms, id)}
     ${goalsHTML}
     ${achievementsHTML}
@@ -1179,6 +1187,7 @@ function renderHistory() {
           <span class="pill ${PILL_CLASS[visitResult]}">${LABELS[visitResult]}</span>
         </div>
         <div class="match-meta">${m.date}${seasonTag}</div>
+        ${mvpNames(m) ? `<div class="match-events">⭐ MVP: ${mvpNames(m)}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1197,12 +1206,14 @@ const ELO_START = 1000;
 const ELO_K = 24; // más alto = los puntajes se mueven más rápido
 
 function calcElo(matches) {
-  const ratings = {}, deltas = {}, games = {}, history = {};
+    const ratings = {}, deltas = {}, games = {}, history = {}, pre = {};
   const get = id => (ratings[id] !== undefined ? ratings[id] : ELO_START);
 
   matches.forEach(m => {
     const L = m.localPlayers || [], V = m.visitPlayers || [];
     if (!L.length || !V.length || !m.result) return; // partidos viejos sin dos equipos
+        pre[m.id] = {};
+    L.concat(V).forEach(id => { pre[m.id][id] = get(id); });
 
     const avg = team => team.reduce((s, id) => s + get(id), 0) / team.length;
     const rL = avg(L), rV = avg(V);
@@ -1220,7 +1231,7 @@ function calcElo(matches) {
     V.forEach(id => apply(id, -deltaL));
   });
 
-  return { ratings, deltas, games, history };
+  return { ratings, deltas, games, history, pre };
 }
 
 function eloDeltaHTML(d) {
@@ -1251,6 +1262,117 @@ function renderEloRanking() {
       ${eloDeltaHTML(x.d)}
       <span class="pill rank-pill" style="background:var(--blue-bg);color:var(--blue);">${x.r}</span>
     </div>`).join('');
+}
+
+// ─── MVP ──────────────────────────────────────────────────────────────────────
+const MVP_PTS = { win: 3, draw: 1, goal: 2, assist: 1, red: -2 };
+const MVP_MIN_MONTH_GAMES = 3;
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function matchPlayerPoints(m, pid) {
+  const r = getPlayerResult(m, pid);
+  const base = r === 'w' ? MVP_PTS.win : r === 'd' ? MVP_PTS.draw : 0;
+  return base
+    + ((m.scorers && m.scorers[pid]) || 0) * MVP_PTS.goal
+    + ((m.assists && m.assists[pid]) || 0) * MVP_PTS.assist
+    + ((m.reds && m.reds[pid]) || 0) * MVP_PTS.red;
+}
+
+// Devuelve los ids del MVP del partido ([] si no hay goles ni asistencias registrados)
+// ELO que tenía cada jugador justo antes de ese partido (dentro de su temporada)
+function getEloPre(m) {
+  const season = m.season || '';
+  const sm = state.matches.filter(x => (x.season || '') === season);
+  return calcElo(sm).pre[m.id] || {};
+}
+
+// Devuelve el id del MVP del partido ([] si no hay goles ni asistencias registrados)
+function getMatchMVPs(m) {
+  const hasEvents = Object.values(m.scorers || {}).some(n => n > 0)
+    || Object.values(m.assists || {}).some(n => n > 0);
+  if (!hasEvents) return [];
+  const ids = [...(m.localPlayers || m.players || []), ...(m.visitPlayers || [])];
+  if (!ids.length) return [];
+  const rows = ids.map(id => ({
+    id,
+    pts: matchPlayerPoints(m, id),
+    g: (m.scorers && m.scorers[id]) || 0,
+    a: (m.assists && m.assists[id]) || 0
+  })).sort((x, y) => y.pts - x.pts || y.g - x.g || y.a - x.a);
+  const top = rows[0];
+  if (top.pts <= 0) return [];
+  const tied = rows.filter(r => r.pts === top.pts && r.g === top.g && r.a === top.a);
+  if (tied.length === 1) return [tied[0].id];
+
+  // Desempate: ELO previo al partido; si sigue igual, orden fijo por id
+  const pre = getEloPre(m);
+  tied.sort((x, y) =>
+    (pre[y.id] || ELO_START) - (pre[x.id] || ELO_START) ||
+    String(x.id).localeCompare(String(y.id)));
+  return [tied[0].id];
+}
+
+function mvpNames(m) {
+  return getMatchMVPs(m)
+    .map(id => (state.players.find(x => x.id === id) || {}).name || '?')
+    .join(', ');
+}
+
+function matchMonth(m) {
+  if (!m.date) return null;
+  const mm = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, sept:8, oct:9, nov:10, dic:11 };
+  const parts = m.date.toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim().split(' ');
+  const mo = mm[parts[2]] !== undefined ? mm[parts[2]] : mm[parts[1]];
+  const yr = parseInt(parts[3]) || parseInt(parts[4]);
+  if (mo === undefined || isNaN(yr)) return null;
+  return { key: `${yr}-${String(mo + 1).padStart(2, '0')}`, label: `${MONTH_NAMES[mo]} ${yr}` };
+}
+
+function calcMonthlyMVP(matches) {
+  const months = {};
+  matches.forEach(m => {
+    const mo = matchMonth(m);
+    if (!mo) return;
+    const ids = [...(m.localPlayers || m.players || []), ...(m.visitPlayers || [])];
+    const bucket = months[mo.key] = months[mo.key] || { label: mo.label, players: {} };
+    ids.forEach(id => {
+      const p = bucket.players[id] = bucket.players[id] || { pts: 0, games: 0 };
+      p.pts += matchPlayerPoints(m, id);
+      p.games++;
+    });
+  });
+  return Object.keys(months).sort().reverse().map(key => {
+    const b = months[key];
+    const rows = Object.entries(b.players)
+      .filter(([, v]) => v.games >= MVP_MIN_MONTH_GAMES)
+      .map(([id, v]) => ({ id, avg: v.pts / v.games, games: v.games }))
+      .sort((x, y) => y.avg - x.avg || y.games - x.games);
+    return { key, label: b.label, winner: rows[0] || null };
+  });
+}
+
+function renderMVPMonths() {
+  const el = document.getElementById('mvp-months');
+  if (!el) return;
+  const list = calcMonthlyMVP(getFilteredMatches()).filter(x => x.winner);
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">Aún no hay MVP del mes (mínimo ${MVP_MIN_MONTH_GAMES} partidos en el mes).</div>`;
+    return;
+  }
+  el.innerHTML = list.map((x, i) => {
+    const p = state.players.find(pl => pl.id === x.winner.id);
+    if (!p) return '';
+    return `
+    <div class="rank-item">
+      <span class="rank-pos">${i === 0 ? '⭐' : '🏅'}</span>
+      ${avatarHTML(p, 24)}
+      <div class="rank-name-wrap">
+        <div class="rank-name">${p.name}</div>
+        <div class="rank-games">${x.label} · ${x.winner.games} partidos</div>
+      </div>
+      <span class="pill rank-pill" style="background:var(--amber-bg);color:var(--amber);">${x.winner.avg.toFixed(1)} pts</span>
+    </div>`;
+  }).join('');
 }
 
 function renderRanking() {
@@ -1339,6 +1461,7 @@ function renderRanking() {
 
 function renderDashboard() {
   renderSeasonSelector('dashboard-season-selector');
+  renderMVPMonths();
   updateSelects();
   renderGlobal();
   renderLogros();
