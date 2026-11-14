@@ -156,7 +156,8 @@
   <div id="ranking-season-selector"></div>
     <div class="ranking-section-title">🎮 Jugador más activo</div>
     <div class="card" style="margin-bottom:12px;"><div id="rank-most-active"></div></div>
-
+    <div class="ranking-section-title">📊 Ranking ELO</div>
+    <div class="card" style="margin-bottom:12px;"><div id="rank-elo"></div></div>
     <div class="ranking-section-title">👤 Ranking individual</div>
     <div class="ranking-row">
       <div class="card ranking-card"><div class="ranking-title rank-w">🏆 Victorias</div><div id="rank-wins"></div></div>
@@ -210,14 +211,18 @@
     <div id="dashboard-logros"></div>
 
     <!-- Gráfica de evolución -->
-    <div class="ranking-section-title">📈 Evolución de victorias</div>
-    <div class="card">
-      <div style="margin-bottom:10px;">
-        <select id="evo-player" onchange="renderEvolution()" style="width:100%;"></select>
-      </div>
-      <canvas id="evo-chart" height="180"></canvas>
-      <div id="evo-empty" class="empty" style="display:none;">Sin partidos suficientes.</div>
-    </div>
+    <div class="ranking-section-title">📈 Evolución</div>
+<div class="card">
+  <div style="margin-bottom:10px;display:flex;gap:6px;">
+    <select id="evo-player" onchange="renderEvolution()" style="flex:1;"></select>
+    <select id="evo-metric" onchange="renderEvolution()">
+      <option value="wins">% victorias</option>
+      <option value="elo">ELO</option>
+    </select>
+  </div>
+  <canvas id="evo-chart" height="180"></canvas>
+  <div id="evo-empty" class="empty" style="display:none;">Sin partidos suficientes.</div>
+</div>
 
     <!-- Comparar temporadas -->
     <div class="ranking-section-title">🏅 Comparar temporadas</div>

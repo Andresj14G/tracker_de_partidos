@@ -560,6 +560,11 @@ function showPlayerDetail(id) {
   const total = ms.length;
   const winPct = total ? Math.round((w/total)*100) : 0;
   const streak = calcStreak(ms, id);
+  const eloData = calcElo(matches);
+  const eloHTML = eloData.games[id] ? `
+    <div class="highlight-box" style="background:var(--blue-bg);color:var(--blue);">
+      📊 <strong>ELO:</strong> ${eloData.ratings[id]} ${eloDeltaHTML(eloData.deltas[id])}
+    </div>` : '';
 
   // Goles
   let goalsFor=0, goalsAgainst=0, goalsIndividual=0, assistsIndividual=0, redsIndividual=0, matchesWithScore=0;
@@ -721,6 +726,7 @@ const partnerRows = partnerEntries
       <div class="stat-box"><div class="stat-num" style="color:var(--red);">${l}</div><div class="stat-lbl">derrotas</div></div>
       <div class="stat-box"><div class="stat-num" style="color:var(--blue);">${winPct}%</div><div class="stat-lbl">% victorias</div></div>
     </div>
+     ${eloHTML}
     ${formBarHTML(ms, id)}
     ${goalsHTML}
     ${achievementsHTML}
@@ -1186,9 +1192,70 @@ async function clearHistory() {
   renderHistory(); showToast('Historial borrado ✓');
 }
 // ─── Ranking ──────────────────────────────────────────────────────────────────
+// ─── ELO ──────────────────────────────────────────────────────────────────────
+const ELO_START = 1000;
+const ELO_K = 24; // más alto = los puntajes se mueven más rápido
+
+function calcElo(matches) {
+  const ratings = {}, deltas = {}, games = {}, history = {};
+  const get = id => (ratings[id] !== undefined ? ratings[id] : ELO_START);
+
+  matches.forEach(m => {
+    const L = m.localPlayers || [], V = m.visitPlayers || [];
+    if (!L.length || !V.length || !m.result) return; // partidos viejos sin dos equipos
+
+    const avg = team => team.reduce((s, id) => s + get(id), 0) / team.length;
+    const rL = avg(L), rV = avg(V);
+    const expL = 1 / (1 + Math.pow(10, (rV - rL) / 400));
+    const scoreL = m.result === 'w' ? 1 : m.result === 'd' ? 0.5 : 0;
+    const deltaL = Math.round(ELO_K * (scoreL - expL));
+
+    const apply = (id, d) => {
+      ratings[id] = get(id) + d;
+      deltas[id] = d;
+      games[id] = (games[id] || 0) + 1;
+      (history[id] = history[id] || []).push(ratings[id]);
+    };
+    L.forEach(id => apply(id, deltaL));
+    V.forEach(id => apply(id, -deltaL));
+  });
+
+  return { ratings, deltas, games, history };
+}
+
+function eloDeltaHTML(d) {
+  if (!d) return '<span class="elo-delta">–</span>';
+  return d > 0
+    ? `<span class="elo-delta up">▲ +${d}</span>`
+    : `<span class="elo-delta down">▼ ${Math.abs(d)}</span>`;
+}
+
+function renderEloRanking() {
+  const el = document.getElementById('rank-elo');
+  if (!el) return;
+  const { ratings, deltas, games } = calcElo(getFilteredMatches());
+  const list = state.players
+    .filter(p => games[p.id])
+    .map(p => ({ p, r: ratings[p.id], d: deltas[p.id], g: games[p.id] }))
+    .sort((a, b) => b.r - a.r);
+  if (!list.length) { el.innerHTML = '<div class="empty">Sin partidos aún.</div>'; return; }
+  const medals = ['🥇', '🥈', '🥉'];
+  el.innerHTML = list.map((x, i) => `
+    <div class="rank-item">
+      <span class="rank-pos">${medals[i] || (i + 1) + '.'}</span>
+      ${avatarHTML(x.p, 24)}
+      <div class="rank-name-wrap">
+        <div class="rank-name">${x.p.name}</div>
+        <div class="rank-games">${x.g} partido${x.g !== 1 ? 's' : ''}</div>
+      </div>
+      ${eloDeltaHTML(x.d)}
+      <span class="pill rank-pill" style="background:var(--blue-bg);color:var(--blue);">${x.r}</span>
+    </div>`).join('');
+}
 
 function renderRanking() {
   renderSeasonSelector('ranking-season-selector');
+    renderEloRanking();
   const matches = getFilteredMatches();
   const medals = ['🥇','🥈','🥉'];
 
@@ -1519,23 +1586,31 @@ function renderEvolution() {
   const emptyEl = document.getElementById('evo-empty');
   if (!pid) return;
   const matches = getFilteredMatches();
+  const metric = document.getElementById('evo-metric')?.value || 'wins';
 
   const ms = matches.filter(m=>(m.localPlayers||[]).includes(pid)||(m.visitPlayers||[]).includes(pid)||(m.players||[]).includes(pid));
   if (ms.length < 2) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
-  canvas.style.display='block'; emptyEl.style.display='none';
 
-  // Calcular % acumulado de victorias por partido
+  if (metric === 'elo') {
+    const hist = calcElo(matches).history[pid] || [];
+    if (hist.length < 2) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
+    canvas.style.display='block'; emptyEl.style.display='none';
+    drawLineChart(canvas, hist.map((_,i)=>`P${i+1}`), hist, { elo: true });
+    return;
+  }
+
+  canvas.style.display='block'; emptyEl.style.display='none';
   let wins=0;
   const data = ms.map((m,i)=>{
     if(getPlayerResult(m,pid)==='w') wins++;
     return Math.round((wins/(i+1))*100);
   });
   const labels = ms.map((_,i)=>`P${i+1}`);
-
   drawLineChart(canvas, labels, data);
 }
 
-function drawLineChart(canvas, labels, data) {
+function drawLineChart(canvas, labels, data, opts) {
+  opts = opts || {};
   const dpr = window.devicePixelRatio||1;
   const W = canvas.offsetWidth||canvas.parentElement.offsetWidth||300;
   const H = 180;
@@ -1548,41 +1623,47 @@ function drawLineChart(canvas, labels, data) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0,0,W,H);
 
-  const pad={top:16,right:16,bottom:28,left:36};
+  const pad={top:16,right:16,bottom:28,left:opts.elo?44:36};
   const cW=W-pad.left-pad.right;
   const cH=H-pad.top-pad.bottom;
 
-  // Color desde CSS variable
+  let min=0, max=100, suffix='%';
+  if (opts.elo) {
+    min=Math.floor((Math.min(...data)-10)/20)*20;
+    max=Math.ceil((Math.max(...data)+10)/20)*20;
+    suffix='';
+  }
+  const range=max-min;
+  const yOf=v=>pad.top+cH*(1-(v-min)/range);
+
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const lineColor=isDark?'#85B7EB':'#185FA5';
   const gridColor=isDark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)';
   const textColor=isDark?'#a8a69f':'#6b6a65';
 
-  // Grid y ejes
   ctx.strokeStyle=gridColor; ctx.lineWidth=1;
-  [0,25,50,75,100].forEach(v=>{
-    const y=pad.top+cH*(1-v/100);
+  [0,1,2,3,4].forEach(i=>{
+    const v=Math.round(min+range*i/4);
+    const y=yOf(v);
     ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cW,y); ctx.stroke();
     ctx.fillStyle=textColor; ctx.font='10px system-ui'; ctx.textAlign='right';
-    ctx.fillText(v+'%',pad.left-4,y+3);
+    ctx.fillText(v+suffix,pad.left-4,y+3);
   });
 
-  // Línea
   ctx.strokeStyle=lineColor; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round';
   ctx.beginPath();
   data.forEach((v,i)=>{
     const x=pad.left+(i/(data.length-1))*cW;
-    const y=pad.top+cH*(1-v/100);
+    const y=yOf(v);
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   });
   ctx.stroke();
 
-  // Área bajo la línea
   ctx.save();
   ctx.beginPath();
   data.forEach((v,i)=>{
     const x=pad.left+(i/(data.length-1))*cW;
-    const y=pad.top+cH*(1-v/100);
+    const y=yOf(v);
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   });
   ctx.lineTo(pad.left+cW, pad.top+cH);
@@ -1593,15 +1674,13 @@ function drawLineChart(canvas, labels, data) {
   grad.addColorStop(1,lineColor+'00');
   ctx.fillStyle=grad; ctx.fill(); ctx.restore();
 
-  // Puntos
   ctx.fillStyle=lineColor;
   data.forEach((v,i)=>{
     const x=pad.left+(i/(data.length-1))*cW;
-    const y=pad.top+cH*(1-v/100);
+    const y=yOf(v);
     ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
   });
 
-  // Labels eje X (máximo 8)
   ctx.fillStyle=textColor; ctx.font='10px system-ui'; ctx.textAlign='center';
   const step=Math.ceil(labels.length/8);
   labels.forEach((lbl,i)=>{

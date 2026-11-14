@@ -971,6 +971,13 @@ input[type=text]:focus, select:focus {
   line-height: 1.5;
 }
 
+.elo-delta {
+  font-size: 11px;
+  margin-right: 8px;
+  color: var(--text2);
+}
+.elo-delta.up { color: var(--green); }
+.elo-delta.down { color: var(--red); }
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE — móvil primero
    ═══════════════════════════════════════════════════════════ */
